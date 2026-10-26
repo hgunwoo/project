@@ -6,33 +6,32 @@ import time
 # 1. 페이지 및 초기 상태 세팅
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="ALL CLE - 스터디플래너 AI",
+    page_title="스터디플래너 AI",
     page_icon="⏱️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 세션 상태 초기화 (초기 상태: 데이터 없음)
+# 세션 상태 완전 초기화 (유저가 직접 입력하도록 기본값 제거)
 if "subjects" not in st.session_state:
-    st.session_state.subjects = []  # 기본 과목 없음
+    st.session_state.subjects = []
 
 if "student_info" not in st.session_state:
     st.session_state.student_info = {
-        "school": "고등학교",
-        "grade": "2학년",
-        "class_num": "8반",
-        "name": "한건우",
-        "exam_date": datetime.date.today() + datetime.timedelta(days=14)
+        "school": "",
+        "grade": "",
+        "class_num": "",
+        "name": "",
+        "exam_date": None  # 초기 상태에는 시험일 미설정
     }
 
 if "settings" not in st.session_state:
     st.session_state.settings = {
         "theme": "다크 모드",
-        "language": "한국어",
-        "bgm": "선택 안함"
+        "language": "한국어"
     }
 
-# 타이머 상태 관리 {subject_id: {"running": Bool, "start_time": float, "elapsed": int}}
+# 타이머 상태 관리
 if "timers" not in st.session_state:
     st.session_state.timers = {}
 
@@ -56,24 +55,32 @@ BGM_LINKS = {
     "🌲 숲속 자연의 소리": "https://www.youtube.com/watch?v=xNN7iTA57jM"
 }
 
+COLOR_OPTIONS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
+
 # -----------------------------------------------------------------------------
 # 3. 사이드바 (설정, 프로필, BGM, 과목 추가)
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.title("⚙️ 올클 스터디 설정")
+    st.title("⚙️ 스터디 설정")
     
     # 지필고사 및 학생 정보
     with st.expander("👤 프로필 & 지필고사 설정", expanded=True):
-        school = st.text_input("학교명", st.session_state.student_info["school"])
+        school = st.text_input("학교명", value=st.session_state.student_info["school"], placeholder="예: OO고등학교")
         col_g, col_c = st.columns(2)
         with col_g:
-            grade = st.selectbox("학년", ["1학년", "2학년", "3학년"], index=1)
+            grade = st.text_input("학년", value=st.session_state.student_info["grade"], placeholder="예: 2학년")
         with col_c:
-            class_num = st.text_input("반", st.session_state.student_info["class_num"])
-        name = st.text_input("이름", st.session_state.student_info["name"])
+            class_num = st.text_input("반", value=st.session_state.student_info["class_num"], placeholder="예: 8반")
+        name = st.text_input("이름", value=st.session_state.student_info["name"], placeholder="예: 한건우")
         
-        # 통합 지필고사 D-Day 설정
-        exam_date = st.date_input("🗓️ 지필고사 시작일", value=st.session_state.student_info["exam_date"])
+        # 지필고사 D-Day 선택 (초기값 없음)
+        st.markdown("**🗓️ 지필고사 시작일 설정**")
+        set_exam = st.checkbox("시험일 지정하기", value=(st.session_state.student_info["exam_date"] is not None))
+        if set_exam:
+            curr_val = st.session_state.student_info["exam_date"] or datetime.date.today()
+            exam_date = st.date_input("시험 날짜", value=curr_val)
+        else:
+            exam_date = None
         
         if st.button("설정 저장", use_container_width=True):
             st.session_state.student_info = {
@@ -83,11 +90,12 @@ with st.sidebar:
                 "name": name,
                 "exam_date": exam_date
             }
-            st.success("학생 정보 및 시험일이 저장되었습니다!")
+            st.success("설정이 저장되었습니다!")
+            st.rerun()
 
-    # 앱 환경 설정 (테마, 언어)
+    # 앱 환경 설정
     with st.expander("🎨 환경 및 테마 설정"):
-        theme = st.selectbox("앱 테마", ["다크 모드", "라이트 모드", "파스텔 핑크", "딥 블루"], index=0)
+        theme = st.selectbox("앱 테마", ["다크 모드", "라이트 모드", "퍼플 모드"], index=0)
         lang = st.selectbox("언어 (Language)", ["한국어", "English", "日本語"], index=0)
         st.session_state.settings["theme"] = theme
         st.session_state.settings["language"] = lang
@@ -104,7 +112,8 @@ with st.sidebar:
     st.subheader("➕ 과목 추가하기")
     with st.form("add_subject_form", clear_on_submit=True):
         sub_name = st.text_input("과목명", placeholder="예: 수학 II, 영어, 한국사")
-        target_hours = st.number_input("목표 공부 시간 (시간 단위)", min_value=1, max_value=300, value=10)
+        target_hours = st.number_input("목표 공부 시간 (시간)", min_value=1, max_value=300, value=10)
+        sub_color = st.color_picker("과목 테마 색상", value="#6366F1")
         
         btn_add = st.form_submit_button("과목 등록하기", use_container_width=True)
         if btn_add:
@@ -116,129 +125,139 @@ with st.sidebar:
                     "id": new_id,
                     "name": sub_name,
                     "target_hours": target_hours,
-                    "logged_seconds": 0
+                    "logged_seconds": 0,
+                    "color": sub_color
                 })
                 st.success(f"'{sub_name}' 과목이 추가되었습니다.")
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 4. 메인 화면 상단 (10초 자동 변경 명언 + 통합 D-Day 헤더)
+# 4. 메인 화면 상단 (명언 + 통합 D-Day 헤더)
 # -----------------------------------------------------------------------------
-# 10초마다 명언 로테이션
+# 10초마다 명언 자동 전환
 quote_index = int(time.time() // 10) % len(QUOTES)
 st.info(f"💬 {QUOTES[quote_index]}")
 
-# 지필고사 D-Day 계산
-today = datetime.date.today()
-exam_d = st.session_state.student_info["exam_date"]
-d_day_val = (exam_d - today).days
+# 정보 표시 및 D-Day 연산
+info = st.session_state.student_info
+student_str = f"{info['school']} {info['grade']} {info['class_num']} {info['name']}".strip()
+if not student_str:
+    student_str = "사이드바에서 학생 정보를 설정해 주세요."
 
-if d_day_val > 0:
-    d_day_text = f"D-{d_day_val}"
-elif d_day_val == 0:
-    d_day_text = "D-DAY (오늘!)"
+exam_d = info["exam_date"]
+if exam_d is None:
+    d_day_text = "미설정"
+    delta_sub = "사이드바에서 지필고사 일을 지정하세요"
 else:
-    d_day_text = f"D+{abs(d_day_val)}"
+    today = datetime.date.today()
+    d_day_val = (exam_d - today).days
+    if d_day_val > 0:
+        d_day_text = f"D-{d_day_val}"
+    elif d_day_val == 0:
+        d_day_text = "D-DAY"
+    else:
+        d_day_text = f"D+{abs(d_day_val)}"
+    delta_sub = f"시험일: {exam_d.strftime('%m/%d')}"
 
-# 상단 올클 헤더
 c_head1, c_head2 = st.columns([3, 1])
 with c_head1:
-    st.title("⏱️ 올클 (ALL CLE) 스터디플래너")
-    info = st.session_state.student_info
-    st.caption(f"🏫 {info['school']} {info['grade']} {info['class_num']} **{info['name']}** 학생의 플래너")
+    st.title("⏱️ 스터디플래너 AI")
+    st.caption(f"🏫 **{student_str}**")
 with c_head2:
-    st.metric("🎯 지필고사 D-Day", d_day_text, delta=f"시험일: {exam_d.strftime('%m/%d')}")
+    st.metric("🎯 지필고사 D-Day", d_day_text, delta=delta_sub)
 
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 5. 과목별 타이머 & 진행도 자동 집계 메인 영역
+# 5. 올클 스터디 앱 스타일: 타임라인 및 과목 스톱워치
 # -----------------------------------------------------------------------------
-st.subheader("📚 나의 공부 과목 & 타이머 관리")
+st.subheader("📊 오늘의 공부 타임라인 & 과목 스톱워치")
 
 if not st.session_state.subjects:
-    st.warning("등록된 과목이 없습니다. 왼쪽 사이드바에서 지필고사 과목을 추가하고 타이머로 공부를 시작해 보세요!")
+    st.warning("등록된 과목이 없습니다. 왼쪽 사이드바에서 지필고사 공부 과목을 등록해 보세요!")
 else:
-    for idx, sub in enumerate(st.session_state.subjects):
-        sub_id = sub["id"]
-        
-        # 타이머 데이터 초기화
+    # 전체 누적 공부시간 계산
+    total_sec = sum(s["logged_seconds"] for s in st.session_state.subjects)
+    total_h = total_sec // 3600
+    total_m = (total_sec % 3600) // 60
+    
+    st.markdown(f"### 📅 TOTAL TIME: **{total_h}시간 {total_m}분**")
+    
+    col_left, col_right = st.columns([1, 1])
+    
+    # [왼쪽] 올클 스타일의 과목별 시간 기록 목록
+    with col_left:
+        st.markdown("#### ⏱️ 과목별 누적 공부 시간")
+        for sub in st.session_state.subjects:
+            s_sec = sub["logged_seconds"]
+            s_h = s_sec // 3600
+            s_m = (s_sec % 3600) // 60
+            s_s = s_sec % 60
+            
+            # 올클 앱 스타일 컬러 태그와 시간 레이아웃
+            st.markdown(
+                f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.05); border-left: 6px solid {sub['color']};">
+                    <span style="font-weight: bold; font-size: 16px;">{sub['name']}</span>
+                    <span style="font-family: monospace; font-size: 16px;">{s_h:02d}:{s_m:02d}:{s_s:02d}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    # [오른쪽] 스톱워치 측정 및 과목 조작
+    with col_right:
+        st.markdown("#### ▶️ 스톱워치 측정")
+        selected_sub_name = st.selectbox("공부할 과목 선택", [s["name"] for s in st.session_state.subjects])
+        selected_sub = next(s for s in st.session_state.subjects if s["name"] == selected_sub_name)
+        sub_id = selected_sub["id"]
+
         if sub_id not in st.session_state.timers:
             st.session_state.timers[sub_id] = {"running": False, "start_time": 0}
 
-        # 공부 시간 연산 (초 -> 시간/분/초)
-        logged_sec = sub["logged_seconds"]
-        target_sec = sub["target_hours"] * 3600
-        progress_pct = min(round((logged_sec / target_sec) * 100, 1), 100.0)
-        
-        hrs = logged_sec // 3600
-        mins = (logged_sec % 3600) // 60
-        secs = logged_sec % 60
-        time_str = f"{hrs:02d}시간 {mins:02d}분 {secs:02d}초"
+        is_running = st.session_state.timers[sub_id]["running"]
 
-        with st.expander(f"📖 **{sub['name']}** | 진행률: {progress_pct}% ({hrs}시간 {mins}분 / {sub['target_hours']}시간)", expanded=True):
-            col_left, col_right = st.columns([2, 1])
-            
-            with col_left:
-                st.progress(progress_pct / 100)
-                st.write(f"⏱️ **누적 공부 시간**: `{time_str}` (목표: {sub['target_hours']}시간)")
-                
-                # 타이머 조작 버튼
-                t_col1, t_col2, t_col3 = st.columns(3)
-                
-                is_running = st.session_state.timers[sub_id]["running"]
-                
-                with t_col1:
-                    if not is_running:
-                        if st.button("▶️ 공부 시작", key=f"start_{sub_id}", use_container_width=True):
-                            st.session_state.timers[sub_id]["running"] = True
-                            st.session_state.timers[sub_id]["start_time"] = time.time()
-                            st.rerun()
-                    else:
-                        if st.button("⏸️ 일시정지", key=f"pause_{sub_id}", use_container_width=True):
-                            now = time.time()
-                            elapsed = int(now - st.session_state.timers[sub_id]["start_time"])
-                            sub["logged_seconds"] += elapsed
-                            st.session_state.timers[sub_id]["running"] = False
-                            st.rerun()
-                
-                with t_col2:
-                    if st.button("⏹️ 타이머 초기화", key=f"reset_{sub_id}", use_container_width=True):
-                        sub["logged_seconds"] = 0
-                        st.session_state.timers[sub_id]["running"] = False
-                        st.rerun()
-                        
-                with t_col3:
-                    if st.button("🗑️ 과목 삭제", key=f"del_{sub_id}", use_container_width=True):
-                        st.session_state.subjects.pop(idx)
-                        st.session_state.timers.pop(sub_id, None)
-                        st.rerun()
-                        
-                if is_running:
-                    st.caption("🔥 공부 시간이 측정 중입니다! 다 마치면 [일시정지]를 눌러 기록을 반영해 주세요.")
-
-            with col_right:
-                st.markdown("**🎯 과목목표 수정**")
-                new_target = st.number_input("목표시간 변경", min_value=1, max_value=300, value=sub["target_hours"], key=f"target_input_{sub_id}")
-                if new_target != sub["target_hours"]:
-                    sub["target_hours"] = new_target
+        btn_c1, btn_c2, btn_c3 = st.columns(3)
+        with btn_c1:
+            if not is_running:
+                if st.button("▶️ 공부 시작", key=f"start_{sub_id}", use_container_width=True):
+                    st.session_state.timers[sub_id]["running"] = True
+                    st.session_state.timers[sub_id]["start_time"] = time.time()
+                    st.rerun()
+            else:
+                if st.button("⏸️ 일시정지 및 저장", key=f"pause_{sub_id}", use_container_width=True):
+                    now = time.time()
+                    elapsed = int(now - st.session_state.timers[sub_id]["start_time"])
+                    selected_sub["logged_seconds"] += elapsed
+                    st.session_state.timers[sub_id]["running"] = False
                     st.rerun()
 
+        with btn_c2:
+            if st.button("⏹️ 시간 초기화", key=f"reset_{sub_id}", use_container_width=True):
+                selected_sub["logged_seconds"] = 0
+                st.session_state.timers[sub_id]["running"] = False
+                st.rerun()
+
+        with btn_c3:
+            if st.button("🗑️ 과목 삭제", key=f"del_{sub_id}", use_container_width=True):
+                st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub_id]
+                st.session_state.timers.pop(sub_id, None)
+                st.rerun()
+
+        if is_running:
+            st.warning(f"🔥 [{selected_sub['name']}] 공부 시간을 측정 중입니다! 공부를 마치면 '일시정지 및 저장'을 눌러주세요.")
+
 # -----------------------------------------------------------------------------
-# 6. Gemini AI 피드백
+# 6. Gemini AI 맞춤 피드백
 # -----------------------------------------------------------------------------
 st.markdown("---")
-st.subheader("🤖 올클 AI 피드백")
-if st.button("현재 공부 진행 상황 AI 진단받기"):
+st.subheader("🤖 AI 맞춤 공부 진단")
+if st.button("현재 학습 데이터 기반 AI 코칭받기"):
     if not st.session_state.subjects:
-        st.warning("과목을 먼저 등록해주세요.")
+        st.warning("과목을 먼저 등록해 주세요.")
     else:
-        st.success("📊 학습 진행률 및 지필고사 D-Day를 바탕으로 한 맞춤 피드백:")
+        st.success("📊 학습 진행 데이터 분석 결과:")
         for s in st.session_state.subjects:
-            p = round((s['logged_seconds'] / (s['target_hours'] * 3600)) * 100, 1)
-            if d_day_val <= 7 and p < 40:
-                st.write(f"- 🚨 **{s['name']}**: 시험이 7일 남았으나 진행률이 {p}%입니다. 타이머를 켜고 핵심 문제 위주로 공부하세요!")
-            elif p >= 80:
-                st.write(f"- 🎉 **{s['name']}**: 진행률 {p}% 달성! 실전 문제 풀이로 마무리하세요.")
-            else:
-                st.write(f"- 📘 **{s['name']}**: 진행률 {p}%. 지금처럼 매일 스톱워치를 측정하며 꾸준히 학습하세요.")
+            hrs = round(s["logged_seconds"] / 3600, 1)
+            pct = min(round((hrs / s["target_hours"]) * 100, 1), 100.0)
+            st.write(f"- **{s['name']}**: 목표 {s['target_hours']}시간 중 현재 **{hrs}시간**({pct}%) 달성하였습니다.")
