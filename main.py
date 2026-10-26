@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 세션 상태 완전 초기화 (유저가 직접 입력하도록 기본값 제거)
+# 세션 상태 완전 초기화
 if "subjects" not in st.session_state:
     st.session_state.subjects = []
 
@@ -22,7 +22,7 @@ if "student_info" not in st.session_state:
         "grade": "",
         "class_num": "",
         "name": "",
-        "exam_date": None  # 초기 상태에는 시험일 미설정
+        "exam_date": None
     }
 
 if "settings" not in st.session_state:
@@ -31,7 +31,6 @@ if "settings" not in st.session_state:
         "language": "한국어"
     }
 
-# 타이머 상태 관리
 if "timers" not in st.session_state:
     st.session_state.timers = {}
 
@@ -55,8 +54,6 @@ BGM_LINKS = {
     "🌲 숲속 자연의 소리": "https://www.youtube.com/watch?v=xNN7iTA57jM"
 }
 
-COLOR_OPTIONS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"]
-
 # -----------------------------------------------------------------------------
 # 3. 사이드바 (설정, 프로필, BGM, 과목 추가)
 # -----------------------------------------------------------------------------
@@ -73,7 +70,6 @@ with st.sidebar:
             class_num = st.text_input("반", value=st.session_state.student_info["class_num"], placeholder="예: 8반")
         name = st.text_input("이름", value=st.session_state.student_info["name"], placeholder="예: 한건우")
         
-        # 지필고사 D-Day 선택 (초기값 없음)
         st.markdown("**🗓️ 지필고사 시작일 설정**")
         set_exam = st.checkbox("시험일 지정하기", value=(st.session_state.student_info["exam_date"] is not None))
         if set_exam:
@@ -100,7 +96,7 @@ with st.sidebar:
         st.session_state.settings["theme"] = theme
         st.session_state.settings["language"] = lang
 
-    # 잔잔한 BGM 오디오 플레이어
+    # BGM 오디오 플레이어
     st.markdown("---")
     st.subheader("🎵 집중 BGM 플레이어")
     selected_bgm = st.selectbox("공부할 때 들을 BGM", list(BGM_LINKS.keys()))
@@ -134,11 +130,9 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 4. 메인 화면 상단 (명언 + 통합 D-Day 헤더)
 # -----------------------------------------------------------------------------
-# 10초마다 명언 자동 전환
 quote_index = int(time.time() // 10) % len(QUOTES)
 st.info(f"💬 {QUOTES[quote_index]}")
 
-# 정보 표시 및 D-Day 연산
 info = st.session_state.student_info
 student_str = f"{info['school']} {info['grade']} {info['class_num']} {info['name']}".strip()
 if not student_str:
@@ -169,15 +163,14 @@ with c_head2:
 st.markdown("---")
 
 # -----------------------------------------------------------------------------
-# 5. 올클 스터디 앱 스타일: 타임라인 및 과목 스톱워치
+# 5. 올클 스터디 앱 스타일: 과목 스톱워치 및 타임라인 (KeyError 수정 부)
 # -----------------------------------------------------------------------------
 st.subheader("📊 오늘의 공부 타임라인 & 과목 스톱워치")
 
 if not st.session_state.subjects:
     st.warning("등록된 과목이 없습니다. 왼쪽 사이드바에서 지필고사 공부 과목을 등록해 보세요!")
 else:
-    # 전체 누적 공부시간 계산
-    total_sec = sum(s["logged_seconds"] for s in st.session_state.subjects)
+    total_sec = sum(s.get("logged_seconds", 0) for s in st.session_state.subjects)
     total_h = total_sec // 3600
     total_m = (total_sec % 3600) // 60
     
@@ -185,19 +178,21 @@ else:
     
     col_left, col_right = st.columns([1, 1])
     
-    # [왼쪽] 올클 스타일의 과목별 시간 기록 목록
+    # [왼쪽] 과목별 시간 기록 목록 (KeyError 방지 적용)
     with col_left:
         st.markdown("#### ⏱️ 과목별 누적 공부 시간")
         for sub in st.session_state.subjects:
-            s_sec = sub["logged_seconds"]
+            s_sec = sub.get("logged_seconds", 0)
             s_h = s_sec // 3600
             s_m = (s_sec % 3600) // 60
             s_s = s_sec % 60
             
-            # 올클 앱 스타일 컬러 태그와 시간 레이아웃
+            # Key Error 방지: color 키가 없으면 기본 보라색(#6366F1) 적용
+            bg_color = sub.get("color", "#6366F1")
+            
             st.markdown(
                 f"""
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.05); border-left: 6px solid {sub['color']};">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.05); border-left: 6px solid {bg_color};">
                     <span style="font-weight: bold; font-size: 16px;">{sub['name']}</span>
                     <span style="font-family: monospace; font-size: 16px;">{s_h:02d}:{s_m:02d}:{s_s:02d}</span>
                 </div>
@@ -228,7 +223,7 @@ else:
                 if st.button("⏸️ 일시정지 및 저장", key=f"pause_{sub_id}", use_container_width=True):
                     now = time.time()
                     elapsed = int(now - st.session_state.timers[sub_id]["start_time"])
-                    selected_sub["logged_seconds"] += elapsed
+                    selected_sub["logged_seconds"] = selected_sub.get("logged_seconds", 0) + elapsed
                     st.session_state.timers[sub_id]["running"] = False
                     st.rerun()
 
@@ -258,6 +253,8 @@ if st.button("현재 학습 데이터 기반 AI 코칭받기"):
     else:
         st.success("📊 학습 진행 데이터 분석 결과:")
         for s in st.session_state.subjects:
-            hrs = round(s["logged_seconds"] / 3600, 1)
-            pct = min(round((hrs / s["target_hours"]) * 100, 1), 100.0)
-            st.write(f"- **{s['name']}**: 목표 {s['target_hours']}시간 중 현재 **{hrs}시간**({pct}%) 달성하였습니다.")
+            s_sec = s.get("logged_seconds", 0)
+            target = s.get("target_hours", 10)
+            hrs = round(s_sec / 3600, 1)
+            pct = min(round((hrs / target) * 100, 1), 100.0)
+            st.write(f"- **{s['name']}**: 목표 {target}시간 중 현재 **{hrs}시간**({pct}%) 달성하였습니다.")
