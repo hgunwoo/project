@@ -30,7 +30,6 @@ if "student_info" not in st.session_state:
 if "theme" not in st.session_state:
     st.session_state.theme = "다크 모드"
 
-# 스톱워치 상태 관리 (active_sub_id, running, start_time, elapsed)
 if "stopwatch" not in st.session_state:
     st.session_state.stopwatch = {
         "active_sub_id": None,
@@ -40,7 +39,7 @@ if "stopwatch" not in st.session_state:
     }
 
 # -----------------------------------------------------------------------------
-# 3. 실시간 테마(CSS) 동적 적용
+# 3. 실시간 테마(CSS) 동적 적용 & 그라데이션 스타일링 극대화
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
@@ -48,14 +47,17 @@ if current_theme == "라이트 모드":
     bg_css = "background-color: #F8FAFC; color: #0F172A;"
     card_css = "background: #FFFFFF; color: #0F172A; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);"
     header_gradient = "linear-gradient(135deg, #6366F1 0%, #A855F7 100%)"
+    total_gradient = "linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%)"
 elif current_theme == "파스텔 모드":
     bg_css = "background-color: #FDF4F5; color: #4A4E69;"
     card_css = "background: #FFFFFF; color: #4A4E69; border: 1px solid #F4ACB7; box-shadow: 0 4px 10px rgba(244,172,183,0.2);"
     header_gradient = "linear-gradient(135deg, #FFB5A7 0%, #FCD5CE 100%)"
+    total_gradient = "linear-gradient(135deg, #F4ACB7 0%, #FFCAD4 50%, #B5E2FA 100%)"
 else:  # 다크 모드 (기본)
     bg_css = "background-color: #0F172A; color: #F8FAFC;"
     card_css = "background: rgba(30, 41, 59, 0.7); color: #F8FAFC; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px);"
     header_gradient = "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)"
+    total_gradient = "linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%)"
 
 st.markdown(f"""
 <style>
@@ -84,6 +86,29 @@ st.markdown(f"""
         justify-content: space-between;
         align-items: center;
     }}
+
+    /* 그라데이션 타이틀 & 카드 스타일 */
+    .gradient-total-card {{
+        background: {total_gradient};
+        color: white;
+        border-radius: 20px;
+        padding: 20px 28px;
+        margin-top: 10px;
+        margin-bottom: 25px;
+        box-shadow: 0 12px 30px -8px rgba(124, 58, 237, 0.45);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
+
+    .gradient-header-text {{
+        background: {header_gradient};
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+        font-size: 22px;
+        display: inline-block;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -93,7 +118,6 @@ st.markdown(f"""
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
-    # 테마 설정
     st.session_state.theme = st.selectbox(
         "🎨 앱 테마 선택", 
         ["다크 모드", "라이트 모드", "파스텔 모드"], 
@@ -152,7 +176,7 @@ with st.sidebar:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. 그래픽 배너 및 D-Day 영역
+# 5. 그래픽 메인 배너
 # -----------------------------------------------------------------------------
 QUOTES = [
     "“지금 자면 꿈을 꾸지만, 지금 공부하면 꿈을 이룬다.”",
@@ -175,7 +199,6 @@ else:
     d_day_val = (exam_d - today).days
     d_day_text = f"D-{d_day_val}" if d_day_val > 0 else ("D-DAY" if d_day_val == 0 else f"D+{abs(d_day_val)}")
 
-# 고화질 SVG 일러스트가 포함된 이쁜 헤더 배너
 st.markdown(f"""
 <div class="banner-box">
     <div>
@@ -193,17 +216,16 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 6. 메인 공부 타임라인 및 파이썬 완전 연동 실시간 스톱워치
+# 6. 그라데이션 커스텀 스타일이 전면 적용된 메인 영역
 # -----------------------------------------------------------------------------
-st.subheader("📊 오늘의 공부 타임라인 & 과목 스톱워치")
+# [섹션 제목] 그라데이션 적용 텍스트
+st.markdown('<div class="gradient-header-text">📊 오늘의 공부 타임라인 & 과목 스톱워치</div>', unsafe_allow_html=True)
 
 if not st.session_state.subjects:
     st.info("등록된 과목이 없습니다. 왼쪽 사이드바에서 과목을 먼저 등록해 보세요!")
 else:
-    # 전체 누적 시간 계산
     total_sec = sum(s.get("logged_seconds", 0) for s in st.session_state.subjects)
     
-    # 스톱워치가 동작 중이면 실시간으로 경과된 시간을 total에 더해줌
     sw = st.session_state.stopwatch
     if sw["running"]:
         live_elapsed = int(time.time() - sw["start_time"])
@@ -213,17 +235,29 @@ else:
     grand_total_sec = total_sec + sw["accumulated"] + live_elapsed
     g_h, g_m, g_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
 
-    st.markdown(f"### 📅 TOTAL TIME: **{g_h:02d}시간 {g_m:02d}분 {g_s:02d}초**")
+    # [TOTAL TIME] 화려한 그라데이션 패널 카드
+    st.markdown(f"""
+    <div class="gradient-total-card">
+        <div>
+            <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 600;">Cumulative Time Today</div>
+            <div style="font-size: 34px; font-weight: 900; font-family: monospace; letter-spacing: 1px; margin-top: 2px;">
+                ⏱️ TOTAL TIME: {g_h:02d}시간 {g_m:02d}분 {g_s:02d}초
+            </div>
+        </div>
+        <div style="background: rgba(255, 255, 255, 0.2); padding: 8px 18px; border-radius: 14px; font-size: 14px; font-weight: 700; backdrop-filter: blur(10px);">
+            🔥 열공 중!
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     col_left, col_right = st.columns([1, 1])
 
-    # [좌측] 과목별 공부 시간 현황
+    # [좌측] 과목별 누적 타임라인
     with col_left:
-        st.markdown("#### ⏱️ 과목별 누적 타임라인")
+        st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">⏱️ 과목별 누적 타임라인</div>', unsafe_allow_html=True)
         for sub in st.session_state.subjects:
             s_sec = sub.get("logged_seconds", 0)
             
-            # 스톱워치 측정 중인 과목이면 현재 실시간 초를 더해서 보여줌
             if sw["running"] and sw["active_sub_id"] == sub["id"]:
                 s_sec += sw["accumulated"] + live_elapsed
             elif not sw["running"] and sw["active_sub_id"] == sub["id"]:
@@ -248,16 +282,15 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-    # [우측] 파이썬 완전 동기화 스톱워치 조작기
+    # [우측] 파이썬 완전 연동 실시간 스톱워치
     with col_right:
-        st.markdown("#### ▶️ 실시간 과목 스톱워치")
+        st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">▶️ 실시간 과목 스톱워치</div>', unsafe_allow_html=True)
         
         sub_names = [s["name"] for s in st.session_state.subjects]
         selected_sub_name = st.selectbox("공부할 과목 선택", sub_names)
         selected_sub = next(s for s in st.session_state.subjects if s["name"] == selected_sub_name)
         sub_id = selected_sub["id"]
 
-        # 현재 스톱워치 측정 상태 계산
         is_current_active = (sw["active_sub_id"] == sub_id)
         current_display_sec = 0
         
@@ -268,9 +301,9 @@ else:
         disp_m = (current_display_sec % 3600) // 60
         disp_s = current_display_sec % 60
 
-        # 시각화된 타이머 디스플레이
+        # 실시간 스톱워치 디스플레이
         st.markdown(f"""
-        <div style="background: rgba(99, 102, 241, 0.1); border: 2px dashed #6366F1; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px;">
+        <div style="background: rgba(99, 102, 241, 0.08); border: 2px dashed #6366F1; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px;">
             <div style="font-size: 13px; opacity: 0.8; margin-bottom: 5px;">측정 중인 과목: <b>{selected_sub['name']}</b></div>
             <div style="font-size: 42px; font-weight: 900; font-family: monospace; color: #6366F1;">
                 {disp_h:02d}:{disp_m:02d}:{disp_s:02d}
@@ -318,7 +351,6 @@ else:
                 st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub_id]
                 st.rerun()
 
-        # 스톱워치가 작동 중일 때 1초마다 실시간 화면 자동 새로고침 갱신
         if sw["running"]:
             time.sleep(1)
             st.rerun()
@@ -327,7 +359,7 @@ else:
 # 7. Gemini AI 맞춤 학습 피드백
 # -----------------------------------------------------------------------------
 st.markdown("---")
-st.subheader("🤖 AI 맞춤 공부 진단")
+st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 AI 맞춤 공부 진단</div>', unsafe_allow_html=True)
 if st.button("현재 학습 데이터 기반 AI 코칭받기"):
     if not st.session_state.subjects:
         st.warning("과목을 먼저 등록해 주세요.")
