@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. 세션 상태 초기화
+# 2. 세션 상태 초기화 (기본: 라이트 모드)
 # -----------------------------------------------------------------------------
 if "subjects" not in st.session_state:
     st.session_state.subjects = []
@@ -43,7 +43,7 @@ if "omr_results" not in st.session_state:
     st.session_state.omr_results = {}
 
 # -----------------------------------------------------------------------------
-# 3. 테마별 동적 적용 (라이트 기본)
+# 3. 테마별 반응형 스타일링 적용
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
@@ -65,7 +65,7 @@ elif current_theme == "파스텔 모드":
     total_gradient = "linear-gradient(135deg, #FFB5A7 0%, #FFCAD4 50%, #B5E2FA 100%)"
     timer_box_bg = "background: #FFF0F3; border: 2px dashed #FFB5A7;"
     timer_text_color = "#E07A5F"
-else:  # 라이트 모드
+else:  # 라이트 모드 (기본)
     bg_css = "background-color: #F8FAFC; color: #0F172A;"
     card_css = "background: #FFFFFF; color: #0F172A; border: 1px solid #E2E8F0; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);"
     text_color = "#0F172A"
@@ -132,18 +132,11 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 4. 사이드바 (설정 & Gemini API 키 등록)
+# 4. 사이드바 (설정 & 과목 추가)
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
-    # Gemini API 키 입력 창 (AI 조언 연동용)
-    with st.expander("🔑 Gemini AI API 키 설정", expanded=False):
-        api_key_input = st.text_input("Gemini API Key", type="password", help="Google AI Studio에서 발급받은 API 키를 입력하세요.")
-        if api_key_input:
-            st.session_state.api_key = api_key_input
-            st.caption("✅ API Key 등록 완료")
-
     st.session_state.theme = st.selectbox(
         "🎨 앱 테마 선택", 
         ["라이트 모드", "다크 모드", "파스텔 모드"], 
@@ -387,7 +380,7 @@ with tab2:
     st.caption("남은 D-Day와 목표 시간 대비 달성률을 알고리즘으로 연산하여 과목별 위험 지수를 측정합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
     else:
         for sub in st.session_state.subjects:
             target_sec = sub["target_hours"] * 3600
@@ -424,7 +417,7 @@ with tab3:
     st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
     else:
         target_omr_sub = st.selectbox("가채점할 과목 선택", [s["name"] for s in st.session_state.subjects])
         
@@ -463,7 +456,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. 실시간 Gemini AI API 기반 맞춤 1:1 공부 진단 (고정 멘트 제거)
+# 7. 서버 Secrets 연동 Gemini AI 1:1 맞춤 피드백
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -472,15 +465,14 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
     if not st.session_state.subjects:
         st.warning("과목을 먼저 등록해 주세요.")
     else:
-        # API 키 확인 (세션 저장값 또는 st.secrets 활용)
-        api_key = st.session_state.get("api_key", "")
+        # Streamlit Secrets에서 API 키 자동 조회
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
         
         if not api_key:
-            st.warning("⚠️ 왼쪽 사이드바 [🔑 Gemini AI API 키 설정]에서 API Key를 등록하시면 실시간 AI 분석을 받아볼 수 있습니다!")
+            st.error("⚠️ Streamlit Secrets 설정에 'GEMINI_API_KEY'가 설정되지 않았습니다. 관리자 설정(Secrets)을 확인해주세요.")
         else:
-            with st.spinner("🧠 Gemini AI가 과목별 공부시간, D-Day, OMR 감점 원인을 종합 분석하고 있습니다..."):
+            with st.spinner("🧠 Gemini AI가 학습 데이터를 종합 분석하여 맞춤 처방전을 생성 중입니다..."):
                 try:
-                    # AI에게 전달할 유저 종합 데이터 텍스트 구성
                     data_summary = []
                     for s in st.session_state.subjects:
                         logged_h = round(s.get("logged_seconds", 0) / 3600, 1)
@@ -502,13 +494,12 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                     {chr(10).join(data_summary)}
 
                     [작성 지침]
-                    1. 고정된 템플릿 멘트나 반복적인 텍스트를 사용하지 마세요.
-                    2. 현재 남아있는 D-Day 대비 진척도가 부족한 과목을 집어주고, 구체적으로 어떤 순서로 공부해야 할지 전략을 제시하세요.
-                    3. OMR 오답 원인(계산 실수, 시간 부족 등)이 있다면 이를 해결하기 위한 실용적인 꿀팁을 포함해 주세요.
-                    4. 고등학생 친화적인 어조로 사기를 북돋아 주도록 3~4문단 정도로 깔끔하게 작성해 주세요.
+                    1. 고정 템플릿 멘트를 피하고 학생 맞춤형으로 작성하세요.
+                    2. 현재 남아있는 D-Day 대비 진척도가 부족한 과목을 우선 짚어주고, 공부 순서 및 전략을 제시하세요.
+                    3. OMR 오답 원인(계산 실수, 시간 부족 등)이 있다면 실용적인 꿀팁을 포함해 주세요.
+                    4. 고등학생 친화적인 어조로 용기를 북돋아 주도록 3~4문단 정도로 작성해 주세요.
                     """
 
-                    # SDK를 통해 Gemini 호출
                     client = genai.Client(api_key=api_key)
                     response = client.models.generate_content(
                         model='gemini-2.5-flash',
