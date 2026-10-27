@@ -1,6 +1,7 @@
 import streamlit as st
 import datetime
 import time
+from google import genai
 
 # -----------------------------------------------------------------------------
 # 1. 페이지 세팅
@@ -28,7 +29,7 @@ if "student_info" not in st.session_state:
     }
 
 if "theme" not in st.session_state:
-    st.session_state.theme = "다크 모드"
+    st.session_state.theme = "라이트 모드"
 
 if "stopwatch" not in st.session_state:
     st.session_state.stopwatch = {
@@ -38,30 +39,41 @@ if "stopwatch" not in st.session_state:
         "accumulated": 0
     }
 
-# OMR 가채점 기록 세션 저장소
 if "omr_results" not in st.session_state:
     st.session_state.omr_results = {}
 
 # -----------------------------------------------------------------------------
-# 3. 실시간 테마(CSS) 동적 적용 & 기존 고급 그라데이션 스타일 유지
+# 3. 테마별 동적 적용 (라이트 기본)
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
-if current_theme == "라이트 모드":
-    bg_css = "background-color: #F8FAFC; color: #0F172A;"
-    card_css = "background: #FFFFFF; color: #0F172A; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);"
-    header_gradient = "linear-gradient(135deg, #6366F1 0%, #A855F7 100%)"
-    total_gradient = "linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%)"
-elif current_theme == "파스텔 모드":
-    bg_css = "background-color: #FDF4F5; color: #4A4E69;"
-    card_css = "background: #FFFFFF; color: #4A4E69; border: 1px solid #F4ACB7; box-shadow: 0 4px 10px rgba(244,172,183,0.2);"
-    header_gradient = "linear-gradient(135deg, #FFB5A7 0%, #FCD5CE 100%)"
-    total_gradient = "linear-gradient(135deg, #F4ACB7 0%, #FFCAD4 50%, #B5E2FA 100%)"
-else:  # 다크 모드 (기본)
+if current_theme == "다크 모드":
     bg_css = "background-color: #0F172A; color: #F8FAFC;"
-    card_css = "background: rgba(30, 41, 59, 0.7); color: #F8FAFC; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px);"
+    card_css = "background: rgba(30, 41, 59, 0.85); color: #F8FAFC; border: 1px solid rgba(255, 255, 255, 0.12);"
+    text_color = "#F8FAFC"
+    sub_text_color = "#94A3B8"
     header_gradient = "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)"
     total_gradient = "linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%)"
+    timer_box_bg = "background: rgba(99, 102, 241, 0.15); border: 2px dashed #818CF8;"
+    timer_text_color = "#A5B4FC"
+elif current_theme == "파스텔 모드":
+    bg_css = "background-color: #FDF4F5; color: #33272A;"
+    card_css = "background: #FFFFFF; color: #33272A; border: 1px solid #F4ACB7; box-shadow: 0 4px 12px rgba(244,172,183,0.25);"
+    text_color = "#33272A"
+    sub_text_color = "#5C4D51"
+    header_gradient = "linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)"
+    total_gradient = "linear-gradient(135deg, #FFB5A7 0%, #FFCAD4 50%, #B5E2FA 100%)"
+    timer_box_bg = "background: #FFF0F3; border: 2px dashed #FFB5A7;"
+    timer_text_color = "#E07A5F"
+else:  # 라이트 모드
+    bg_css = "background-color: #F8FAFC; color: #0F172A;"
+    card_css = "background: #FFFFFF; color: #0F172A; border: 1px solid #E2E8F0; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);"
+    text_color = "#0F172A"
+    sub_text_color = "#475569"
+    header_gradient = "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)"
+    total_gradient = "linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #DB2777 100%)"
+    timer_box_bg = "background: #EFF6FF; border: 2px dashed #3B82F6;"
+    timer_text_color = "#1D4ED8"
 
 st.markdown(f"""
 <style>
@@ -81,11 +93,11 @@ st.markdown(f"""
     
     .banner-box {{
         background: {header_gradient};
-        color: white;
+        color: white !important;
         border-radius: 20px;
         padding: 24px;
         margin-bottom: 24px;
-        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+        box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -93,12 +105,12 @@ st.markdown(f"""
 
     .gradient-total-card {{
         background: {total_gradient};
-        color: white;
+        color: white !important;
         border-radius: 20px;
         padding: 20px 28px;
         margin-top: 10px;
         margin-bottom: 25px;
-        box-shadow: 0 12px 30px -8px rgba(124, 58, 237, 0.45);
+        box-shadow: 0 12px 30px -8px rgba(37, 99, 235, 0.35);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -113,23 +125,29 @@ st.markdown(f"""
         display: inline-block;
     }}
     
-    /* 위험도 뱃지 스타일 */
-    .danger-badge-high {{ background: #EF4444; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
-    .danger-badge-mid {{ background: #F59E0B; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
-    .danger-badge-low {{ background: #10B981; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
+    .danger-badge-high {{ background: #DC2626; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
+    .danger-badge-mid {{ background: #D97706; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
+    .danger-badge-low {{ background: #059669; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 4. 사이드바 (설정 & 과목 추가)
+# 4. 사이드바 (설정 & Gemini API 키 등록)
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
+    # Gemini API 키 입력 창 (AI 조언 연동용)
+    with st.expander("🔑 Gemini AI API 키 설정", expanded=False):
+        api_key_input = st.text_input("Gemini API Key", type="password", help="Google AI Studio에서 발급받은 API 키를 입력하세요.")
+        if api_key_input:
+            st.session_state.api_key = api_key_input
+            st.caption("✅ API Key 등록 완료")
+
     st.session_state.theme = st.selectbox(
         "🎨 앱 테마 선택", 
-        ["다크 모드", "라이트 모드", "파스텔 모드"], 
-        index=["다크 모드", "라이트 모드", "파스텔 모드"].index(st.session_state.theme)
+        ["라이트 모드", "다크 모드", "파스텔 모드"], 
+        index=["라이트 모드", "다크 모드", "파스텔 모드"].index(st.session_state.theme)
     )
 
     with st.expander("👤 학생 및 지필고사 정보", expanded=True):
@@ -165,7 +183,7 @@ with st.sidebar:
     with st.form("add_subject_form", clear_on_submit=True):
         sub_name = st.text_input("과목명", placeholder="예: 수학 II, 영어")
         target_hours = st.number_input("목표 공부 시간 (시간)", min_value=1, max_value=300, value=10)
-        sub_color = st.color_picker("과목 대표 색상", value="#6366F1")
+        sub_color = st.color_picker("과목 대표 색상", value="#2563EB")
         
         btn_add = st.form_submit_button("과목 등록하기", use_container_width=True)
         if btn_add:
@@ -184,7 +202,7 @@ with st.sidebar:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. 그래픽 메인 배너
+# 5. 메인 헤더 배너
 # -----------------------------------------------------------------------------
 QUOTES = [
     "“지금 자면 꿈을 꾸지만, 지금 공부하면 꿈을 이룬다.”",
@@ -202,7 +220,7 @@ if not student_str:
 exam_d = info["exam_date"]
 if exam_d is None:
     d_day_text = "D-Day 미설정"
-    d_day_val = 14  # 미지정 시 계산 알고리즘 기준 기본 14일 가정
+    d_day_val = 14
 else:
     today = datetime.date.today()
     d_day_val = (exam_d - today).days
@@ -211,27 +229,25 @@ else:
 st.markdown(f"""
 <div class="banner-box">
     <div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 800;">🍎 스터디플래너 AI</h1>
-        <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 15px;">🏫 <b>{student_str}</b></p>
-        <p style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 13px; display: inline-block;">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: white;">🍎 스터디플래너 AI</h1>
+        <p style="margin: 6px 0 0 0; opacity: 0.95; font-size: 15px; color: white;">🏫 <b>{student_str}</b></p>
+        <p style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 13px; display: inline-block; color: white;">
             💬 {QUOTES[quote_index]}
         </p>
     </div>
-    <div style="text-align: right;">
-        <div style="font-size: 14px; opacity: 0.85;">지필고사 카운트다운</div>
-        <div style="font-size: 38px; font-weight: 900; letter-spacing: -1px;">{d_day_text}</div>
+    <div style="text-align: right; color: white;">
+        <div style="font-size: 14px; opacity: 0.9;">지필고사 카운트다운</div>
+        <div style="font-size: 38px; font-weight: 900; letter-spacing: -1px; color: white;">{d_day_text}</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 6. 메인 기능 탭 구성 (경쟁력 강화: 벼락치기 위험도 & OMR 채점 추가)
+# 6. 메인 기능 탭
 # -----------------------------------------------------------------------------
 tab1, tab2, tab3 = st.tabs(["⏱️ 스톱워치 & 타임라인", "🚨 AI 벼락치기 위험도 계산기", "📝 OMR 가채점 & 오답 진단"])
 
-# =============================================================================
 # TAB 1: 스톱워치 & 타임라인
-# =============================================================================
 with tab1:
     st.markdown('<div class="gradient-header-text">📊 오늘의 공부 타임라인 & 과목 스톱워치</div>', unsafe_allow_html=True)
 
@@ -252,12 +268,12 @@ with tab1:
         st.markdown(f"""
         <div class="gradient-total-card">
             <div>
-                <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 600;">Cumulative Time Today</div>
-                <div style="font-size: 34px; font-weight: 900; font-family: monospace; letter-spacing: 1px; margin-top: 2px;">
+                <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 600; color: white;">Cumulative Time Today</div>
+                <div style="font-size: 34px; font-weight: 900; font-family: monospace; letter-spacing: 1px; margin-top: 2px; color: white;">
                     ⏱️ TOTAL TIME: {g_h:02d}시간 {g_m:02d}분 {g_s:02d}초
                 </div>
             </div>
-            <div style="background: rgba(255, 255, 255, 0.2); padding: 8px 18px; border-radius: 14px; font-size: 14px; font-weight: 700; backdrop-filter: blur(10px);">
+            <div style="background: rgba(255, 255, 255, 0.25); color: white; padding: 8px 18px; border-radius: 14px; font-size: 14px; font-weight: 700;">
                 🔥 열공 중!
             </div>
         </div>
@@ -276,19 +292,19 @@ with tab1:
                     s_sec += sw["accumulated"]
 
                 s_h, s_m, s_s = s_sec // 3600, (s_sec % 3600) // 60, s_sec % 60
-                bg_color = sub.get("color", "#6366F1")
+                bg_color = sub.get("color", "#2563EB")
                 target_sec = sub["target_hours"] * 3600
                 pct = min(round((s_sec / target_sec) * 100, 1), 100.0)
 
                 st.markdown(f"""
                 <div class="ios-card" style="border-left: 6px solid {bg_color};">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 700; font-size: 17px;">{sub['name']}</span>
+                        <span style="font-weight: 700; font-size: 17px; color: {text_color};">{sub['name']}</span>
                         <span style="font-family: monospace; font-size: 18px; font-weight: 700; color: {bg_color};">
                             {s_h:02d}:{s_m:02d}:{s_s:02d}
                         </span>
                     </div>
-                    <div style="margin-top: 10px; font-size: 12px; opacity: 0.8;">
+                    <div style="margin-top: 10px; font-size: 13px; color: {sub_text_color};">
                         목표: {sub['target_hours']}시간 중 {pct}% 달성
                     </div>
                 </div>
@@ -313,9 +329,9 @@ with tab1:
             disp_s = current_display_sec % 60
 
             st.markdown(f"""
-            <div style="background: rgba(99, 102, 241, 0.08); border: 2px dashed #6366F1; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px;">
-                <div style="font-size: 13px; opacity: 0.8; margin-bottom: 5px;">측정 중인 과목: <b>{selected_sub['name']}</b></div>
-                <div style="font-size: 42px; font-weight: 900; font-family: monospace; color: #6366F1;">
+            <div style="{timer_box_bg} border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 13px; color: {sub_text_color}; margin-bottom: 5px;">측정 중인 과목: <b style="color: {text_color};">{selected_sub['name']}</b></div>
+                <div style="font-size: 42px; font-weight: 900; font-family: monospace; color: {timer_text_color};">
                     {disp_h:02d}:{disp_m:02d}:{disp_s:02d}
                 </div>
             </div>
@@ -347,7 +363,7 @@ with tab1:
                         selected_sub["logged_seconds"] += sw["accumulated"]
                         sw["accumulated"] = 0
                         sw["active_sub_id"] = None
-                        st.success("공부 시간이 누적 기록에 성공적으로 저장되었습니다!")
+                        st.success("공부 시간이 누적 기록에 저장되었습니다!")
                         st.rerun()
                     else:
                         st.warning("측정된 공부 시간이 없습니다.")
@@ -361,16 +377,14 @@ with tab1:
                     st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub_id]
                     st.rerun()
 
-            if sw["running"]:
-                time.sleep(1)
-                st.rerun()
+        if sw["running"]:
+            time.sleep(1)
+            st.rerun()
 
-# =============================================================================
-# TAB 2: AI 벼락치기 위험도 계산기 (기발한 아이디어 2)
-# =============================================================================
+# TAB 2: AI 벼락치기 위험도 계산기
 with tab2:
     st.markdown('<div class="gradient-header-text">🚨 AI 벼락치기 위험도 진단 및 분석기</div>', unsafe_allow_html=True)
-    st.caption("남은 D-Day와 목표 시간 대비 달성률을 독자적인 알고리즘으로 연산하여 과목별 위험 지수를 측정합니다.")
+    st.caption("남은 D-Day와 목표 시간 대비 달성률을 알고리즘으로 연산하여 과목별 위험 지수를 측정합니다.")
 
     if not st.session_state.subjects:
         st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
@@ -379,43 +393,35 @@ with tab2:
             target_sec = sub["target_hours"] * 3600
             logged_sec = sub.get("logged_seconds", 0)
             
-            # 벼락치기 위험도 알고리즘 연산
-            # Risk = (1 - 달성률) * (14 / (D-Day + 1)) * 100
             progress_ratio = min(logged_sec / target_sec, 1.0) if target_sec > 0 else 0
             safe_dday = max(d_day_val, 1)
             risk_score = min(round((1.0 - progress_ratio) * (10 / safe_dday) * 100, 1), 100.0)
             
             if risk_score >= 70:
-                badge_html = '<span class="danger-badge-high">🚨 위험도 비상 (위험)</span>'
-                advice = "🔴 **경고**: 벼락치기 위험도가 매우 높습니다! 오늘 즉시 요약본 위주로 핵심 개념부터 암기하세요."
+                badge_html = '<span class="danger-badge-high">🚨 위험도 비상</span>'
             elif risk_score >= 40:
                 badge_html = '<span class="danger-badge-mid">⚠️ 주의 필요</span>'
-                advice = "🟡 **주의**: 아직 안정권이 아닙니다. 매일 최소 1.5시간 이상 이 과목에 투자하세요."
             else:
                 badge_html = '<span class="danger-badge-low">✅ 안전권</span>'
-                advice = "🟢 **양호**: 꾸준히 잘 진행되고 있습니다. 기출문제를 풀며 실전 감각을 유지하세요."
 
             st.markdown(f"""
-            <div class="ios-card" style="border-left: 6px solid {sub.get('color', '#6366F1')};">
+            <div class="ios-card" style="border-left: 6px solid {sub.get('color', '#2563EB')};">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 800; font-size: 18px;">{sub['name']}</span>
+                    <span style="font-weight: 800; font-size: 18px; color: {text_color};">{sub['name']}</span>
                     <div>{badge_html}</div>
                 </div>
-                <div style="margin-top: 12px;">
-                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 6px;">
-                        벼락치기 위험 지수: <b style="font-size: 18px; color: #EC4899;">{risk_score}%</b>
+                <div style="margin-top: 10px;">
+                    <div style="font-size: 14px; color: {sub_text_color};">
+                        벼락치기 위험 지수: <b style="font-size: 18px; color: #DB2777;">{risk_score}%</b>
                     </div>
-                    <div style="font-size: 13px; opacity: 0.85;">{advice}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-# =============================================================================
-# TAB 3: OMR 가채점 & 오답 진단 (기발한 아이디어 3)
-# =============================================================================
+# TAB 3: OMR 가채점 & 오답 진단
 with tab3:
     st.markdown('<div class="gradient-header-text">📝 시험 후 OMR 가채점 & 오답 패턴 진단</div>', unsafe_allow_html=True)
-    st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석하여 다음 시험 대비 처방전을 받습니다.")
+    st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석합니다.")
 
     if not st.session_state.subjects:
         st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
@@ -432,52 +438,91 @@ with tab3:
                     "주요 틀린 원인 (복수 선택)",
                     ["개념 이해 부족", "시간 부족으로 찍음", "계산/단순 실수", "문제 잘못 읽음", "고난도 응용 문제"]
                 )
-                submit_omr = st.form_submit_button("가채점 데이터 제출 및 AI 분석", use_container_width=True)
+                submit_omr = st.form_submit_button("가채점 데이터 등록", use_container_width=True)
                 
                 if submit_omr:
                     st.session_state.omr_results[target_omr_sub] = {
                         "score": score_input,
                         "errors": error_types
                     }
-                    st.success(f"'{target_omr_sub}' 채점 결과가 반영되었습니다!")
+                    st.success(f"'{target_omr_sub}' 채점 결과가 저장되었습니다!")
 
-        with col_right:
-            st.markdown("#### 🩺 AI 오답 패턴 진단 리포트")
+        with col_omr2:
+            st.markdown("#### 🩺 저장된 OMR 리포트")
             if target_omr_sub in st.session_state.omr_results:
                 res = st.session_state.omr_results[target_omr_sub]
                 st.markdown(f"""
                 <div class="ios-card">
-                    <h3 style="margin: 0; color: #6366F1;">🎯 {target_omr_sub} 결과 리포트</h3>
-                    <p style="font-size: 20px; font-weight: 800; margin-top: 8px;">점수: {res['score']}점</p>
+                    <h3 style="margin: 0; color: #2563EB;">🎯 {target_omr_sub} 채점 결과</h3>
+                    <p style="font-size: 20px; font-weight: 800; margin-top: 8px; color: {text_color};">점수: {res['score']}점</p>
                     <hr style="opacity: 0.2; margin: 10px 0;">
-                    <p style="font-size: 14px; opacity: 0.9;"><b>주요 감점 요인:</b> {', '.join(res['errors']) if res['errors'] else '없음'}</p>
+                    <p style="font-size: 14px; color: {sub_text_color};"><b>주요 감점 요인:</b> {', '.join(res['errors']) if res['errors'] else '없음'}</p>
                 </div>
                 """, unsafe_allow_html=True)
-                
-                # Gemini AI 처방전 생성
-                st.markdown("**💡 다음 시험을 위한 AI 맞춤 처방전**")
-                if "계산/단순 실수" in res['errors']:
-                    st.write("• 📌 **실수 방지 솔루션**: 풀이 과정을 깔끔하게 정리하는 연습을 하고 검토 시간 5분을 확보하세요.")
-                if "시간 부족으로 찍음" in res['errors']:
-                    st.write("• 📌 **타임 어택 연습**: 평소 문제를 풀 때 스톱워치를 켜고 문항당 2분 제한 시간을 두고 푸는 연습이 필요합니다.")
-                if "개념 이해 부족" in res['errors']:
-                    st.write("• 📌 **기초 개념 재점검**: 단원별 대표 예제를 다시 복습하여 기본기를 단단히 다지세요.")
             else:
-                st.info("왼쪽 폼에서 가채점 결과를 입력하면 AI 진단 리포트가 생성됩니다.")
+                st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. Gemini AI 맞춤 학습 종합 피드백
+# 7. 실시간 Gemini AI API 기반 맞춤 1:1 공부 진단 (고정 멘트 제거)
 # -----------------------------------------------------------------------------
 st.markdown("---")
-st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 AI 맞춤 공부 종합 진단</div>', unsafe_allow_html=True)
-if st.button("전체 학습 데이터 및 벼락치기 위험도 종합 분석받기"):
+st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
+
+if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기", use_container_width=True):
     if not st.session_state.subjects:
         st.warning("과목을 먼저 등록해 주세요.")
     else:
-        st.success("📊 학습 진행 데이터 분석 결과:")
-        for s in st.session_state.subjects:
-            s_sec = s.get("logged_seconds", 0)
-            target = s.get("target_hours", 10)
-            hrs = round(s_sec / 3600, 1)
-            pct = min(round((hrs / target) * 100, 1), 100.0)
-            st.write(f"- **{s['name']}**: 목표 {target}시간 중 현재 **{hrs}시간**({pct}%) 달성하였습니다.")
+        # API 키 확인 (세션 저장값 또는 st.secrets 활용)
+        api_key = st.session_state.get("api_key", "")
+        
+        if not api_key:
+            st.warning("⚠️ 왼쪽 사이드바 [🔑 Gemini AI API 키 설정]에서 API Key를 등록하시면 실시간 AI 분석을 받아볼 수 있습니다!")
+        else:
+            with st.spinner("🧠 Gemini AI가 과목별 공부시간, D-Day, OMR 감점 원인을 종합 분석하고 있습니다..."):
+                try:
+                    # AI에게 전달할 유저 종합 데이터 텍스트 구성
+                    data_summary = []
+                    for s in st.session_state.subjects:
+                        logged_h = round(s.get("logged_seconds", 0) / 3600, 1)
+                        target_h = s.get("target_hours", 10)
+                        omr = st.session_state.omr_results.get(s["name"], None)
+                        omr_str = f", OMR가채점점수: {omr['score']}점, 주요감점원인: {', '.join(omr['errors'])}" if omr else ""
+                        data_summary.append(f"- 과목: {s['name']} (목표: {target_h}시간 중 현재 {logged_h}시간 달성{omr_str})")
+                    
+                    student_info_str = f"{st.session_state.student_info['school']} {st.session_state.student_info['grade']} {st.session_state.student_info['name']}"
+                    
+                    prompt = f"""
+                    당신은 고등학생을 위한 친절하고 명확한 전문 학습 코치 AI입니다.
+                    다음 학생의 지필고사 학습 데이터를 기반으로 동기부여와 함께 실질적이고 구체적인 과목별 맞춤 공부 조언을 제공해 주세요.
+
+                    [학생 정보]
+                    - 학생: {student_info_str}
+                    - 지필고사 카운트다운: {d_day_text} (D-Day)
+                    - 과목별 학습 현황:
+                    {chr(10).join(data_summary)}
+
+                    [작성 지침]
+                    1. 고정된 템플릿 멘트나 반복적인 텍스트를 사용하지 마세요.
+                    2. 현재 남아있는 D-Day 대비 진척도가 부족한 과목을 집어주고, 구체적으로 어떤 순서로 공부해야 할지 전략을 제시하세요.
+                    3. OMR 오답 원인(계산 실수, 시간 부족 등)이 있다면 이를 해결하기 위한 실용적인 꿀팁을 포함해 주세요.
+                    4. 고등학생 친화적인 어조로 사기를 북돋아 주도록 3~4문단 정도로 깔끔하게 작성해 주세요.
+                    """
+
+                    # SDK를 통해 Gemini 호출
+                    client = genai.Client(api_key=api_key)
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                    )
+                    
+                    st.markdown(f"""
+                    <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
+                        <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
+                        <div style="line-height: 1.7; font-size: 15px;">
+                            {response.text}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                except Exception as e:
+                    st.error(f"AI 조언 생성 중 오류가 발생했습니다: {e}")
