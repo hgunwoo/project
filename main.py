@@ -38,8 +38,12 @@ if "stopwatch" not in st.session_state:
         "accumulated": 0
     }
 
+# OMR 가채점 기록 세션 저장소
+if "omr_results" not in st.session_state:
+    st.session_state.omr_results = {}
+
 # -----------------------------------------------------------------------------
-# 3. 실시간 테마(CSS) 동적 적용 & 그라데이션 스타일링 극대화
+# 3. 실시간 테마(CSS) 동적 적용 & 기존 고급 그라데이션 스타일 유지
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
@@ -87,7 +91,6 @@ st.markdown(f"""
         align-items: center;
     }}
 
-    /* 그라데이션 타이틀 & 카드 스타일 */
     .gradient-total-card {{
         background: {total_gradient};
         color: white;
@@ -109,6 +112,11 @@ st.markdown(f"""
         font-size: 22px;
         display: inline-block;
     }}
+    
+    /* 위험도 뱃지 스타일 */
+    .danger-badge-high {{ background: #EF4444; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
+    .danger-badge-mid {{ background: #F59E0B; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
+    .danger-badge-low {{ background: #10B981; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -194,6 +202,7 @@ if not student_str:
 exam_d = info["exam_date"]
 if exam_d is None:
     d_day_text = "D-Day 미설정"
+    d_day_val = 14  # 미지정 시 계산 알고리즘 기준 기본 14일 가정
 else:
     today = datetime.date.today()
     d_day_val = (exam_d - today).days
@@ -216,151 +225,252 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 6. 그라데이션 커스텀 스타일이 전면 적용된 메인 영역
+# 6. 메인 기능 탭 구성 (경쟁력 강화: 벼락치기 위험도 & OMR 채점 추가)
 # -----------------------------------------------------------------------------
-# [섹션 제목] 그라데이션 적용 텍스트
-st.markdown('<div class="gradient-header-text">📊 오늘의 공부 타임라인 & 과목 스톱워치</div>', unsafe_allow_html=True)
+tab1, tab2, tab3 = st.tabs(["⏱️ 스톱워치 & 타임라인", "🚨 AI 벼락치기 위험도 계산기", "📝 OMR 가채점 & 오답 진단"])
 
-if not st.session_state.subjects:
-    st.info("등록된 과목이 없습니다. 왼쪽 사이드바에서 과목을 먼저 등록해 보세요!")
-else:
-    total_sec = sum(s.get("logged_seconds", 0) for s in st.session_state.subjects)
-    
-    sw = st.session_state.stopwatch
-    if sw["running"]:
-        live_elapsed = int(time.time() - sw["start_time"])
+# =============================================================================
+# TAB 1: 스톱워치 & 타임라인
+# =============================================================================
+with tab1:
+    st.markdown('<div class="gradient-header-text">📊 오늘의 공부 타임라인 & 과목 스톱워치</div>', unsafe_allow_html=True)
+
+    if not st.session_state.subjects:
+        st.info("등록된 과목이 없습니다. 왼쪽 사이드바에서 과목을 먼저 등록해 보세요!")
     else:
-        live_elapsed = 0
-
-    grand_total_sec = total_sec + sw["accumulated"] + live_elapsed
-    g_h, g_m, g_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
-
-    # [TOTAL TIME] 화려한 그라데이션 패널 카드
-    st.markdown(f"""
-    <div class="gradient-total-card">
-        <div>
-            <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 600;">Cumulative Time Today</div>
-            <div style="font-size: 34px; font-weight: 900; font-family: monospace; letter-spacing: 1px; margin-top: 2px;">
-                ⏱️ TOTAL TIME: {g_h:02d}시간 {g_m:02d}분 {g_s:02d}초
-            </div>
-        </div>
-        <div style="background: rgba(255, 255, 255, 0.2); padding: 8px 18px; border-radius: 14px; font-size: 14px; font-weight: 700; backdrop-filter: blur(10px);">
-            🔥 열공 중!
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col_left, col_right = st.columns([1, 1])
-
-    # [좌측] 과목별 누적 타임라인
-    with col_left:
-        st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">⏱️ 과목별 누적 타임라인</div>', unsafe_allow_html=True)
-        for sub in st.session_state.subjects:
-            s_sec = sub.get("logged_seconds", 0)
-            
-            if sw["running"] and sw["active_sub_id"] == sub["id"]:
-                s_sec += sw["accumulated"] + live_elapsed
-            elif not sw["running"] and sw["active_sub_id"] == sub["id"]:
-                s_sec += sw["accumulated"]
-
-            s_h, s_m, s_s = s_sec // 3600, (s_sec % 3600) // 60, s_sec % 60
-            bg_color = sub.get("color", "#6366F1")
-            target_sec = sub["target_hours"] * 3600
-            pct = min(round((s_sec / target_sec) * 100, 1), 100.0)
-
-            st.markdown(f"""
-            <div class="ios-card" style="border-left: 6px solid {bg_color};">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 700; font-size: 17px;">{sub['name']}</span>
-                    <span style="font-family: monospace; font-size: 18px; font-weight: 700; color: {bg_color};">
-                        {s_h:02d}:{s_m:02d}:{s_s:02d}
-                    </span>
-                </div>
-                <div style="margin-top: 10px; font-size: 12px; opacity: 0.8;">
-                    목표: {sub['target_hours']}시간 중 {pct}% 달성
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # [우측] 파이썬 완전 연동 실시간 스톱워치
-    with col_right:
-        st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">▶️ 실시간 과목 스톱워치</div>', unsafe_allow_html=True)
+        total_sec = sum(s.get("logged_seconds", 0) for s in st.session_state.subjects)
         
-        sub_names = [s["name"] for s in st.session_state.subjects]
-        selected_sub_name = st.selectbox("공부할 과목 선택", sub_names)
-        selected_sub = next(s for s in st.session_state.subjects if s["name"] == selected_sub_name)
-        sub_id = selected_sub["id"]
+        sw = st.session_state.stopwatch
+        if sw["running"]:
+            live_elapsed = int(time.time() - sw["start_time"])
+        else:
+            live_elapsed = 0
 
-        is_current_active = (sw["active_sub_id"] == sub_id)
-        current_display_sec = 0
-        
-        if is_current_active:
-            current_display_sec = sw["accumulated"] + (int(time.time() - sw["start_time"]) if sw["running"] else 0)
-        
-        disp_h = current_display_sec // 3600
-        disp_m = (current_display_sec % 3600) // 60
-        disp_s = current_display_sec % 60
+        grand_total_sec = total_sec + sw["accumulated"] + live_elapsed
+        g_h, g_m, g_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
 
-        # 실시간 스톱워치 디스플레이
         st.markdown(f"""
-        <div style="background: rgba(99, 102, 241, 0.08); border: 2px dashed #6366F1; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px;">
-            <div style="font-size: 13px; opacity: 0.8; margin-bottom: 5px;">측정 중인 과목: <b>{selected_sub['name']}</b></div>
-            <div style="font-size: 42px; font-weight: 900; font-family: monospace; color: #6366F1;">
-                {disp_h:02d}:{disp_m:02d}:{disp_s:02d}
+        <div class="gradient-total-card">
+            <div>
+                <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 600;">Cumulative Time Today</div>
+                <div style="font-size: 34px; font-weight: 900; font-family: monospace; letter-spacing: 1px; margin-top: 2px;">
+                    ⏱️ TOTAL TIME: {g_h:02d}시간 {g_m:02d}분 {g_s:02d}초
+                </div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.2); padding: 8px 18px; border-radius: 14px; font-size: 14px; font-weight: 700; backdrop-filter: blur(10px);">
+                🔥 열공 중!
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        btn_c1, btn_c2, btn_c3 = st.columns(3)
+        col_left, col_right = st.columns([1, 1])
 
-        with btn_c1:
-            if not (sw["running"] and is_current_active):
-                if st.button("▶️ 공부 시작", use_container_width=True):
-                    if sw["active_sub_id"] != sub_id:
-                        sw["active_sub_id"] = sub_id
-                        sw["accumulated"] = 0
-                    sw["running"] = True
-                    sw["start_time"] = time.time()
-                    st.rerun()
-            else:
-                if st.button("⏸️ 일시정지", use_container_width=True):
-                    sw["accumulated"] += int(time.time() - sw["start_time"])
-                    sw["running"] = False
-                    st.rerun()
+        with col_left:
+            st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">⏱️ 과목별 누적 타임라인</div>', unsafe_allow_html=True)
+            for sub in st.session_state.subjects:
+                s_sec = sub.get("logged_seconds", 0)
+                
+                if sw["running"] and sw["active_sub_id"] == sub["id"]:
+                    s_sec += sw["accumulated"] + live_elapsed
+                elif not sw["running"] and sw["active_sub_id"] == sub["id"]:
+                    s_sec += sw["accumulated"]
 
-        with btn_c2:
-            if st.button("💾 공부 기록 반영", use_container_width=True):
-                if is_current_active:
-                    if sw["running"]:
+                s_h, s_m, s_s = s_sec // 3600, (s_sec % 3600) // 60, s_sec % 60
+                bg_color = sub.get("color", "#6366F1")
+                target_sec = sub["target_hours"] * 3600
+                pct = min(round((s_sec / target_sec) * 100, 1), 100.0)
+
+                st.markdown(f"""
+                <div class="ios-card" style="border-left: 6px solid {bg_color};">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 700; font-size: 17px;">{sub['name']}</span>
+                        <span style="font-family: monospace; font-size: 18px; font-weight: 700; color: {bg_color};">
+                            {s_h:02d}:{s_m:02d}:{s_s:02d}
+                        </span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; opacity: 0.8;">
+                        목표: {sub['target_hours']}시간 중 {pct}% 달성
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        with col_right:
+            st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">▶️ 실시간 과목 스톱워치</div>', unsafe_allow_html=True)
+            
+            sub_names = [s["name"] for s in st.session_state.subjects]
+            selected_sub_name = st.selectbox("공부할 과목 선택", sub_names)
+            selected_sub = next(s for s in st.session_state.subjects if s["name"] == selected_sub_name)
+            sub_id = selected_sub["id"]
+
+            is_current_active = (sw["active_sub_id"] == sub_id)
+            current_display_sec = 0
+            
+            if is_current_active:
+                current_display_sec = sw["accumulated"] + (int(time.time() - sw["start_time"]) if sw["running"] else 0)
+            
+            disp_h = current_display_sec // 3600
+            disp_m = (current_display_sec % 3600) // 60
+            disp_s = current_display_sec % 60
+
+            st.markdown(f"""
+            <div style="background: rgba(99, 102, 241, 0.08); border: 2px dashed #6366F1; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px;">
+                <div style="font-size: 13px; opacity: 0.8; margin-bottom: 5px;">측정 중인 과목: <b>{selected_sub['name']}</b></div>
+                <div style="font-size: 42px; font-weight: 900; font-family: monospace; color: #6366F1;">
+                    {disp_h:02d}:{disp_m:02d}:{disp_s:02d}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            btn_c1, btn_c2, btn_c3 = st.columns(3)
+
+            with btn_c1:
+                if not (sw["running"] and is_current_active):
+                    if st.button("▶️ 공부 시작", use_container_width=True):
+                        if sw["active_sub_id"] != sub_id:
+                            sw["active_sub_id"] = sub_id
+                            sw["accumulated"] = 0
+                        sw["running"] = True
+                        sw["start_time"] = time.time()
+                        st.rerun()
+                else:
+                    if st.button("⏸️ 일시정지", use_container_width=True):
                         sw["accumulated"] += int(time.time() - sw["start_time"])
                         sw["running"] = False
-                    selected_sub["logged_seconds"] += sw["accumulated"]
-                    sw["accumulated"] = 0
-                    sw["active_sub_id"] = None
-                    st.success("공부 시간이 누적 기록에 성공적으로 저장되었습니다!")
-                    st.rerun()
-                else:
-                    st.warning("측정된 공부 시간이 없습니다.")
+                        st.rerun()
 
-        with btn_c3:
-            if st.button("🗑️ 과목 삭제", use_container_width=True):
-                if sw["active_sub_id"] == sub_id:
-                    sw["running"] = False
-                    sw["active_sub_id"] = None
-                    sw["accumulated"] = 0
-                st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub_id]
+            with btn_c2:
+                if st.button("💾 공부 기록 반영", use_container_width=True):
+                    if is_current_active:
+                        if sw["running"]:
+                            sw["accumulated"] += int(time.time() - sw["start_time"])
+                            sw["running"] = False
+                        selected_sub["logged_seconds"] += sw["accumulated"]
+                        sw["accumulated"] = 0
+                        sw["active_sub_id"] = None
+                        st.success("공부 시간이 누적 기록에 성공적으로 저장되었습니다!")
+                        st.rerun()
+                    else:
+                        st.warning("측정된 공부 시간이 없습니다.")
+
+            with btn_c3:
+                if st.button("🗑️ 과목 삭제", use_container_width=True):
+                    if sw["active_sub_id"] == sub_id:
+                        sw["running"] = False
+                        sw["active_sub_id"] = None
+                        sw["accumulated"] = 0
+                    st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub_id]
+                    st.rerun()
+
+            if sw["running"]:
+                time.sleep(1)
                 st.rerun()
 
-        if sw["running"]:
-            time.sleep(1)
-            st.rerun()
+# =============================================================================
+# TAB 2: AI 벼락치기 위험도 계산기 (기발한 아이디어 2)
+# =============================================================================
+with tab2:
+    st.markdown('<div class="gradient-header-text">🚨 AI 벼락치기 위험도 진단 및 분석기</div>', unsafe_allow_html=True)
+    st.caption("남은 D-Day와 목표 시간 대비 달성률을 독자적인 알고리즘으로 연산하여 과목별 위험 지수를 측정합니다.")
+
+    if not st.session_state.subjects:
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
+    else:
+        for sub in st.session_state.subjects:
+            target_sec = sub["target_hours"] * 3600
+            logged_sec = sub.get("logged_seconds", 0)
+            
+            # 벼락치기 위험도 알고리즘 연산
+            # Risk = (1 - 달성률) * (14 / (D-Day + 1)) * 100
+            progress_ratio = min(logged_sec / target_sec, 1.0) if target_sec > 0 else 0
+            safe_dday = max(d_day_val, 1)
+            risk_score = min(round((1.0 - progress_ratio) * (10 / safe_dday) * 100, 1), 100.0)
+            
+            if risk_score >= 70:
+                badge_html = '<span class="danger-badge-high">🚨 위험도 비상 (위험)</span>'
+                advice = "🔴 **경고**: 벼락치기 위험도가 매우 높습니다! 오늘 즉시 요약본 위주로 핵심 개념부터 암기하세요."
+            elif risk_score >= 40:
+                badge_html = '<span class="danger-badge-mid">⚠️ 주의 필요</span>'
+                advice = "🟡 **주의**: 아직 안정권이 아닙니다. 매일 최소 1.5시간 이상 이 과목에 투자하세요."
+            else:
+                badge_html = '<span class="danger-badge-low">✅ 안전권</span>'
+                advice = "🟢 **양호**: 꾸준히 잘 진행되고 있습니다. 기출문제를 풀며 실전 감각을 유지하세요."
+
+            st.markdown(f"""
+            <div class="ios-card" style="border-left: 6px solid {sub.get('color', '#6366F1')};">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 800; font-size: 18px;">{sub['name']}</span>
+                    <div>{badge_html}</div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 6px;">
+                        벼락치기 위험 지수: <b style="font-size: 18px; color: #EC4899;">{risk_score}%</b>
+                    </div>
+                    <div style="font-size: 13px; opacity: 0.85;">{advice}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+# =============================================================================
+# TAB 3: OMR 가채점 & 오답 진단 (기발한 아이디어 3)
+# =============================================================================
+with tab3:
+    st.markdown('<div class="gradient-header-text">📝 시험 후 OMR 가채점 & 오답 패턴 진단</div>', unsafe_allow_html=True)
+    st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석하여 다음 시험 대비 처방전을 받습니다.")
+
+    if not st.session_state.subjects:
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
+    else:
+        target_omr_sub = st.selectbox("가채점할 과목 선택", [s["name"] for s in st.session_state.subjects])
+        
+        col_omr1, col_omr2 = st.columns([1, 1])
+        
+        with col_omr1:
+            st.markdown("#### 📥 가채점 점수 및 오답 유형 입력")
+            with st.form("omr_form"):
+                score_input = st.number_input("시험 가채점 점수 (점)", min_value=0, max_value=100, value=85)
+                error_types = st.multiselect(
+                    "주요 틀린 원인 (복수 선택)",
+                    ["개념 이해 부족", "시간 부족으로 찍음", "계산/단순 실수", "문제 잘못 읽음", "고난도 응용 문제"]
+                )
+                submit_omr = st.form_submit_button("가채점 데이터 제출 및 AI 분석", use_container_width=True)
+                
+                if submit_omr:
+                    st.session_state.omr_results[target_omr_sub] = {
+                        "score": score_input,
+                        "errors": error_types
+                    }
+                    st.success(f"'{target_omr_sub}' 채점 결과가 반영되었습니다!")
+
+        with col_right:
+            st.markdown("#### 🩺 AI 오답 패턴 진단 리포트")
+            if target_omr_sub in st.session_state.omr_results:
+                res = st.session_state.omr_results[target_omr_sub]
+                st.markdown(f"""
+                <div class="ios-card">
+                    <h3 style="margin: 0; color: #6366F1;">🎯 {target_omr_sub} 결과 리포트</h3>
+                    <p style="font-size: 20px; font-weight: 800; margin-top: 8px;">점수: {res['score']}점</p>
+                    <hr style="opacity: 0.2; margin: 10px 0;">
+                    <p style="font-size: 14px; opacity: 0.9;"><b>주요 감점 요인:</b> {', '.join(res['errors']) if res['errors'] else '없음'}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Gemini AI 처방전 생성
+                st.markdown("**💡 다음 시험을 위한 AI 맞춤 처방전**")
+                if "계산/단순 실수" in res['errors']:
+                    st.write("• 📌 **실수 방지 솔루션**: 풀이 과정을 깔끔하게 정리하는 연습을 하고 검토 시간 5분을 확보하세요.")
+                if "시간 부족으로 찍음" in res['errors']:
+                    st.write("• 📌 **타임 어택 연습**: 평소 문제를 풀 때 스톱워치를 켜고 문항당 2분 제한 시간을 두고 푸는 연습이 필요합니다.")
+                if "개념 이해 부족" in res['errors']:
+                    st.write("• 📌 **기초 개념 재점검**: 단원별 대표 예제를 다시 복습하여 기본기를 단단히 다지세요.")
+            else:
+                st.info("왼쪽 폼에서 가채점 결과를 입력하면 AI 진단 리포트가 생성됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. Gemini AI 맞춤 학습 피드백
+# 7. Gemini AI 맞춤 학습 종합 피드백
 # -----------------------------------------------------------------------------
 st.markdown("---")
-st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 AI 맞춤 공부 진단</div>', unsafe_allow_html=True)
-if st.button("현재 학습 데이터 기반 AI 코칭받기"):
+st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 AI 맞춤 공부 종합 진단</div>', unsafe_allow_html=True)
+if st.button("전체 학습 데이터 및 벼락치기 위험도 종합 분석받기"):
     if not st.session_state.subjects:
         st.warning("과목을 먼저 등록해 주세요.")
     else:
