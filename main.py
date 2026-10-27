@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. 세션 상태 초기화 (기본: 라이트 모드)
+# 2. 세션 상태 초기화 (초기 테마: 라이트 모드)
 # -----------------------------------------------------------------------------
 if "subjects" not in st.session_state:
     st.session_state.subjects = []
@@ -28,6 +28,7 @@ if "student_info" not in st.session_state:
         "exam_date": None
     }
 
+# 라이트 모드 기본 설정
 if "theme" not in st.session_state:
     st.session_state.theme = "라이트 모드"
 
@@ -43,20 +44,11 @@ if "omr_results" not in st.session_state:
     st.session_state.omr_results = {}
 
 # -----------------------------------------------------------------------------
-# 3. 테마별 반응형 스타일링 적용
+# 3. 테마별 동적 적용 (라이트 모드 & 파스텔 모드만 유지)
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
-if current_theme == "다크 모드":
-    bg_css = "background-color: #0F172A; color: #F8FAFC;"
-    card_css = "background: rgba(30, 41, 59, 0.85); color: #F8FAFC; border: 1px solid rgba(255, 255, 255, 0.12);"
-    text_color = "#F8FAFC"
-    sub_text_color = "#94A3B8"
-    header_gradient = "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)"
-    total_gradient = "linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%)"
-    timer_box_bg = "background: rgba(99, 102, 241, 0.15); border: 2px dashed #818CF8;"
-    timer_text_color = "#A5B4FC"
-elif current_theme == "파스텔 모드":
+if current_theme == "파스텔 모드":
     bg_css = "background-color: #FDF4F5; color: #33272A;"
     card_css = "background: #FFFFFF; color: #33272A; border: 1px solid #F4ACB7; box-shadow: 0 4px 12px rgba(244,172,183,0.25);"
     text_color = "#33272A"
@@ -137,10 +129,11 @@ st.markdown(f"""
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
+    # 다크 모드 제거: 라이트 모드와 파스텔 모드만 제공
     st.session_state.theme = st.selectbox(
         "🎨 앱 테마 선택", 
-        ["라이트 모드", "다크 모드", "파스텔 모드"], 
-        index=["라이트 모드", "다크 모드", "파스텔 모드"].index(st.session_state.theme)
+        ["라이트 모드", "파스텔 모드"], 
+        index=["라이트 모드", "파스텔 모드"].index(st.session_state.theme) if st.session_state.theme in ["라이트 모드", "파스텔 모드"] else 0
     )
 
     with st.expander("👤 학생 및 지필고사 정보", expanded=True):
@@ -380,7 +373,7 @@ with tab2:
     st.caption("남은 D-Day와 목표 시간 대비 달성률을 알고리즘으로 연산하여 과목별 위험 지수를 측정합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
     else:
         for sub in st.session_state.subjects:
             target_sec = sub["target_hours"] * 3600
@@ -417,7 +410,7 @@ with tab3:
     st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
     else:
         target_omr_sub = st.selectbox("가채점할 과목 선택", [s["name"] for s in st.session_state.subjects])
         
@@ -456,7 +449,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. 서버 Secrets 연동 Gemini AI 1:1 맞춤 피드백
+# 7. 서버 Secrets 연동 Gemini AI 1:1 맞춤 피드백 (모델명 오류 수정 완료)
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -465,7 +458,6 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
     if not st.session_state.subjects:
         st.warning("과목을 먼저 등록해 주세요.")
     else:
-        # Streamlit Secrets에서 API 키 자동 조회
         api_key = st.secrets.get("GEMINI_API_KEY", "")
         
         if not api_key:
@@ -501,8 +493,9 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                     """
 
                     client = genai.Client(api_key=api_key)
+                    # 지원 중단된 gemini-2.5-flash 대신 안정 표준 모델 gemini-1.5-flash로 수정
                     response = client.models.generate_content(
-                        model='gemini-2.5-flash',
+                        model='gemini-1.5-flash',
                         contents=prompt,
                     )
                     
