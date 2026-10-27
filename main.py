@@ -1,10 +1,9 @@
 import streamlit as st
 import datetime
 import time
-import streamlit.components.v1 as components
 
 # -----------------------------------------------------------------------------
-# 1. 페이지 세팅 및 아이폰 감성 CSS 스타일링
+# 1. 페이지 세팅
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="스터디플래너 AI",
@@ -12,56 +11,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# iOS 스타일 테마 CSS 적용
-st.markdown("""
-<style>
-    /* 전체 폰트 및 배경 깔끔하게 설정 */
-    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-    * {
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-    }
-    
-    /* 카드 및 컨테이너 iOS 글래스모피즘 디자인 */
-    .ios-card {
-        background: rgba(255, 255, 255, 0.07);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 20px;
-        padding: 20px;
-        margin-bottom: 15px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    }
-    .ios-card:hover {
-        transform: translateY(-2px);
-        border-color: rgba(255, 255, 255, 0.25);
-    }
-    
-    /* 아이폰 Badge 디자인 */
-    .ios-badge {
-        background: linear-gradient(135deg, #6366F1 0%, #a855f7 100%);
-        color: white;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 600;
-        display: inline-block;
-    }
-    
-    /* 애니메이션 들어간 텍스트 */
-    .quote-box {
-        background: rgba(99, 102, 241, 0.1);
-        border-left: 4px solid #6366F1;
-        padding: 12px 18px;
-        border-radius: 12px;
-        font-size: 15px;
-        font-weight: 500;
-        margin-bottom: 20px;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # 2. 세션 상태 초기화
@@ -78,12 +27,79 @@ if "student_info" not in st.session_state:
         "exam_date": None
     }
 
+if "theme" not in st.session_state:
+    st.session_state.theme = "다크 모드"
+
+# 스톱워치 상태 관리 (active_sub_id, running, start_time, elapsed)
+if "stopwatch" not in st.session_state:
+    st.session_state.stopwatch = {
+        "active_sub_id": None,
+        "running": False,
+        "start_time": 0,
+        "accumulated": 0
+    }
+
 # -----------------------------------------------------------------------------
-# 3. 사이드바 (설정 & 과목 추가)
+# 3. 실시간 테마(CSS) 동적 적용
+# -----------------------------------------------------------------------------
+current_theme = st.session_state.theme
+
+if current_theme == "라이트 모드":
+    bg_css = "background-color: #F8FAFC; color: #0F172A;"
+    card_css = "background: #FFFFFF; color: #0F172A; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);"
+    header_gradient = "linear-gradient(135deg, #6366F1 0%, #A855F7 100%)"
+elif current_theme == "파스텔 모드":
+    bg_css = "background-color: #FDF4F5; color: #4A4E69;"
+    card_css = "background: #FFFFFF; color: #4A4E69; border: 1px solid #F4ACB7; box-shadow: 0 4px 10px rgba(244,172,183,0.2);"
+    header_gradient = "linear-gradient(135deg, #FFB5A7 0%, #FCD5CE 100%)"
+else:  # 다크 모드 (기본)
+    bg_css = "background-color: #0F172A; color: #F8FAFC;"
+    card_css = "background: rgba(30, 41, 59, 0.7); color: #F8FAFC; border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px);"
+    header_gradient = "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)"
+
+st.markdown(f"""
+<style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    * {{ font-family: 'Pretendard', -apple-system, sans-serif; }}
+    
+    .stApp {{ {bg_css} }}
+    
+    .ios-card {{
+        {card_css}
+        border-radius: 18px;
+        padding: 20px;
+        margin-bottom: 15px;
+        transition: transform 0.2s ease;
+    }}
+    .ios-card:hover {{ transform: translateY(-2px); }}
+    
+    .banner-box {{
+        background: {header_gradient};
+        color: white;
+        border-radius: 20px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 4. 사이드바 (설정 & 과목 추가)
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
+    # 테마 설정
+    st.session_state.theme = st.selectbox(
+        "🎨 앱 테마 선택", 
+        ["다크 모드", "라이트 모드", "파스텔 모드"], 
+        index=["다크 모드", "라이트 모드", "파스텔 모드"].index(st.session_state.theme)
+    )
+
     with st.expander("👤 학생 및 지필고사 정보", expanded=True):
         school = st.text_input("학교명", value=st.session_state.student_info["school"], placeholder="예: OO고등학교")
         col_g, col_c = st.columns(2)
@@ -109,7 +125,7 @@ with st.sidebar:
                 "name": name,
                 "exam_date": exam_date
             }
-            st.success("설정이 저장되었습니다.")
+            st.success("정보가 저장되었습니다.")
             st.rerun()
 
     st.markdown("---")
@@ -117,7 +133,7 @@ with st.sidebar:
     with st.form("add_subject_form", clear_on_submit=True):
         sub_name = st.text_input("과목명", placeholder="예: 수학 II, 영어")
         target_hours = st.number_input("목표 공부 시간 (시간)", min_value=1, max_value=300, value=10)
-        sub_color = st.color_picker("과목 테마 색상", value="#6366F1")
+        sub_color = st.color_picker("과목 대표 색상", value="#6366F1")
         
         btn_add = st.form_submit_button("과목 등록하기", use_container_width=True)
         if btn_add:
@@ -136,194 +152,179 @@ with st.sidebar:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 4. 헤더 및 D-Day 영역
+# 5. 그래픽 배너 및 D-Day 영역
 # -----------------------------------------------------------------------------
 QUOTES = [
     "“지금 자면 꿈을 꾸지만, 지금 공부하면 꿈을 이룬다.”",
     "“성공은 매일 반복되는 작은 노력들의 합이다.”",
     "“오늘 흘린 땀은 내일의 배신을 하지 않는다.”",
-    "“시작하는 방법은 말하기를 그만두고 행동하는 것이다.”",
     "“포기하고 싶을 때, 왜 시작했는지 생각하라.”"
 ]
 quote_index = int(time.time() // 10) % len(QUOTES)
-st.markdown(f'<div class="quote-box">💬 {QUOTES[quote_index]}</div>', unsafe_allow_html=True)
 
 info = st.session_state.student_info
 student_str = f"{info['school']} {info['grade']} {info['class_num']} {info['name']}".strip()
 if not student_str:
-    student_str = "사이드바에서 학생 정보를 설정해 주세요."
+    student_str = "사이드바에서 학생 정보와 지필고사 일을 설정하세요."
 
 exam_d = info["exam_date"]
 if exam_d is None:
-    d_day_text = "미설정"
-    delta_sub = "시험일을 설정해 주세요"
+    d_day_text = "D-Day 미설정"
 else:
     today = datetime.date.today()
     d_day_val = (exam_d - today).days
     d_day_text = f"D-{d_day_val}" if d_day_val > 0 else ("D-DAY" if d_day_val == 0 else f"D+{abs(d_day_val)}")
-    delta_sub = f"시험일: {exam_d.strftime('%m/%d')}"
 
-c_head1, c_head2 = st.columns([3, 1])
-with c_head1:
-    st.title("🍎 스터디플래너 AI")
-    st.caption(f"🏫 **{student_str}**")
-with c_head2:
-    st.metric("🎯 지필고사 D-Day", d_day_text, delta=delta_sub)
-
-st.markdown("---")
+# 고화질 SVG 일러스트가 포함된 이쁜 헤더 배너
+st.markdown(f"""
+<div class="banner-box">
+    <div>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800;">🍎 스터디플래너 AI</h1>
+        <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 15px;">🏫 <b>{student_str}</b></p>
+        <p style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 13px; display: inline-block;">
+            💬 {QUOTES[quote_index]}
+        </p>
+    </div>
+    <div style="text-align: right;">
+        <div style="font-size: 14px; opacity: 0.85;">지필고사 카운트다운</div>
+        <div style="font-size: 38px; font-weight: 900; letter-spacing: -1px;">{d_day_text}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 5. 메인 레이아웃: 과목 타임라인 + 아이폰 스타일 실시간 스톱워치
+# 6. 메인 공부 타임라인 및 파이썬 완전 연동 실시간 스톱워치
 # -----------------------------------------------------------------------------
 st.subheader("📊 오늘의 공부 타임라인 & 과목 스톱워치")
 
 if not st.session_state.subjects:
-    st.warning("등록된 과목이 없습니다. 왼쪽 사이드바에서 지필고사 공부 과목을 등록해 보세요!")
+    st.info("등록된 과목이 없습니다. 왼쪽 사이드바에서 과목을 먼저 등록해 보세요!")
 else:
+    # 전체 누적 시간 계산
     total_sec = sum(s.get("logged_seconds", 0) for s in st.session_state.subjects)
-    total_h = total_sec // 3600
-    total_m = (total_sec % 3600) // 60
     
-    st.markdown(f"### 📅 TOTAL TIME: **{total_h}시간 {total_m}분**")
-    
+    # 스톱워치가 동작 중이면 실시간으로 경과된 시간을 total에 더해줌
+    sw = st.session_state.stopwatch
+    if sw["running"]:
+        live_elapsed = int(time.time() - sw["start_time"])
+    else:
+        live_elapsed = 0
+
+    grand_total_sec = total_sec + sw["accumulated"] + live_elapsed
+    g_h, g_m, g_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
+
+    st.markdown(f"### 📅 TOTAL TIME: **{g_h:02d}시간 {g_m:02d}분 {g_s:02d}초**")
+
     col_left, col_right = st.columns([1, 1])
-    
-    # [좌측] 과목별 누적 공부 시간 목록
+
+    # [좌측] 과목별 공부 시간 현황
     with col_left:
-        st.markdown("#### ⏱️ 과목별 누적 기록")
+        st.markdown("#### ⏱️ 과목별 누적 타임라인")
         for sub in st.session_state.subjects:
             s_sec = sub.get("logged_seconds", 0)
+            
+            # 스톱워치 측정 중인 과목이면 현재 실시간 초를 더해서 보여줌
+            if sw["running"] and sw["active_sub_id"] == sub["id"]:
+                s_sec += sw["accumulated"] + live_elapsed
+            elif not sw["running"] and sw["active_sub_id"] == sub["id"]:
+                s_sec += sw["accumulated"]
+
             s_h, s_m, s_s = s_sec // 3600, (s_sec % 3600) // 60, s_sec % 60
             bg_color = sub.get("color", "#6366F1")
-            
-            st.markdown(
-                f"""
-                <div class="ios-card" style="border-left: 6px solid {bg_color}; padding: 14px 18px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 700; font-size: 17px;">{sub['name']}</span>
-                        <span style="font-family: monospace; font-size: 18px; font-weight: 600;">{s_h:02d}:{s_m:02d}:{s_s:02d}</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            target_sec = sub["target_hours"] * 3600
+            pct = min(round((s_sec / target_sec) * 100, 1), 100.0)
 
-    # [우측] 아이폰 애니메이션 적용 실시간 초 단위 스톱워치 (JavaScript 기반)
-    with col_right:
-        st.markdown("#### ▶️ 실시간 스톱워치")
-        selected_sub_name = st.selectbox("공부할 과목 선택", [s["name"] for s in st.session_state.subjects])
-        selected_sub = next(s for s in st.session_state.subjects if s["name"] == selected_sub_name)
-        
-        # HTML/JS 실시간 카운팅 위젯
-        html_code = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                .timer-container {{
-                    background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-                    border: 1px solid rgba(255, 255, 255, 0.15);
-                    border-radius: 24px;
-                    padding: 24px;
-                    text-align: center;
-                    color: white;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                }}
-                .display {{
-                    font-size: 44px;
-                    font-weight: 700;
-                    font-family: monospace;
-                    letter-spacing: 2px;
-                    margin: 15px 0;
-                    color: #A855F7;
-                    text-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
-                }}
-                .btn-group {{
-                    display: flex;
-                    gap: 10px;
-                    justify-content: center;
-                }}
-                .ios-btn {{
-                    border: none;
-                    border-radius: 14px;
-                    padding: 12px 24px;
-                    font-weight: 600;
-                    font-size: 15px;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }}
-                .start-btn {{ background: #10B981; color: white; }}
-                .pause-btn {{ background: #EF4444; color: white; }}
-                .reset-btn {{ background: rgba(255,255,255,0.2); color: white; }}
-                .ios-btn:active {{ transform: scale(0.95); }}
-            </style>
-        </head>
-        <body>
-            <div class="timer-container">
-                <div style="font-size: 14px; opacity: 0.8;">현재 측정과목: <b>{selected_sub['name']}</b></div>
-                <div class="display" id="time-display">00:00:00</div>
-                <div class="btn-group">
-                    <button class="ios-btn start-btn" onclick="startTimer()">▶ 공부 시작</button>
-                    <button class="ios-btn pause-btn" onclick="pauseTimer()">⏸ 일시정지</button>
-                    <button class="ios-btn reset-btn" onclick="resetTimer()">⏹ 리셋</button>
+            st.markdown(f"""
+            <div class="ios-card" style="border-left: 6px solid {bg_color};">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; font-size: 17px;">{sub['name']}</span>
+                    <span style="font-family: monospace; font-size: 18px; font-weight: 700; color: {bg_color};">
+                        {s_h:02d}:{s_m:02d}:{s_s:02d}
+                    </span>
+                </div>
+                <div style="margin-top: 10px; font-size: 12px; opacity: 0.8;">
+                    목표: {sub['target_hours']}시간 중 {pct}% 달성
                 </div>
             </div>
+            """, unsafe_allow_html=True)
 
-            <script>
-                let timer = null;
-                let seconds = 0;
+    # [우측] 파이썬 완전 동기화 스톱워치 조작기
+    with col_right:
+        st.markdown("#### ▶️ 실시간 과목 스톱워치")
+        
+        sub_names = [s["name"] for s in st.session_state.subjects]
+        selected_sub_name = st.selectbox("공부할 과목 선택", sub_names)
+        selected_sub = next(s for s in st.session_state.subjects if s["name"] == selected_sub_name)
+        sub_id = selected_sub["id"]
 
-                function updateDisplay() {{
-                    let hrs = Math.floor(seconds / 3600);
-                    let mins = Math.floor((seconds % 3600) / 60);
-                    let secs = seconds % 60;
-                    document.getElementById('time-display').innerText = 
-                        String(hrs).padStart(2, '0') + ':' + 
-                        String(mins).padStart(2, '0') + ':' + 
-                        String(secs).padStart(2, '0');
-                }}
+        # 현재 스톱워치 측정 상태 계산
+        is_current_active = (sw["active_sub_id"] == sub_id)
+        current_display_sec = 0
+        
+        if is_current_active:
+            current_display_sec = sw["accumulated"] + (int(time.time() - sw["start_time"]) if sw["running"] else 0)
+        
+        disp_h = current_display_sec // 3600
+        disp_m = (current_display_sec % 3600) // 60
+        disp_s = current_display_sec % 60
 
-                function startTimer() {{
-                    if (!timer) {{
-                        timer = setInterval(() => {{
-                            seconds++;
-                            updateDisplay();
-                        }}, 1000);
-                    }}
-                }}
+        # 시각화된 타이머 디스플레이
+        st.markdown(f"""
+        <div style="background: rgba(99, 102, 241, 0.1); border: 2px dashed #6366F1; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 15px;">
+            <div style="font-size: 13px; opacity: 0.8; margin-bottom: 5px;">측정 중인 과목: <b>{selected_sub['name']}</b></div>
+            <div style="font-size: 42px; font-weight: 900; font-family: monospace; color: #6366F1;">
+                {disp_h:02d}:{disp_m:02d}:{disp_s:02d}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-                function pauseTimer() {{
-                    if (timer) {{
-                        clearInterval(timer);
-                        timer = null;
-                    }}
-                }}
+        btn_c1, btn_c2, btn_c3 = st.columns(3)
 
-                function resetTimer() {{
-                    pauseTimer();
-                    seconds = 0;
-                    updateDisplay();
-                }}
-            </script>
-        </body>
-        </html>
-        """
-        components.html(html_code, height=220)
+        with btn_c1:
+            if not (sw["running"] and is_current_active):
+                if st.button("▶️ 공부 시작", use_container_width=True):
+                    if sw["active_sub_id"] != sub_id:
+                        sw["active_sub_id"] = sub_id
+                        sw["accumulated"] = 0
+                    sw["running"] = True
+                    sw["start_time"] = time.time()
+                    st.rerun()
+            else:
+                if st.button("⏸️ 일시정지", use_container_width=True):
+                    sw["accumulated"] += int(time.time() - sw["start_time"])
+                    sw["running"] = False
+                    st.rerun()
 
-        # 수동 저장 또는 타이머 결과 반영 버튼
-        add_sec = st.number_input("측정한 시간 저장하기 (초 단위)", min_value=0, max_value=86400, value=0, step=60)
-        if st.button("💾 측정된 시간 공부 기록에 반영", use_container_width=True):
-            if add_sec > 0:
-                selected_sub["logged_seconds"] += add_sec
-                st.success(f"{add_sec}초가 성공적으로 추가되었습니다!")
+        with btn_c2:
+            if st.button("💾 공부 기록 반영", use_container_width=True):
+                if is_current_active:
+                    if sw["running"]:
+                        sw["accumulated"] += int(time.time() - sw["start_time"])
+                        sw["running"] = False
+                    selected_sub["logged_seconds"] += sw["accumulated"]
+                    sw["accumulated"] = 0
+                    sw["active_sub_id"] = None
+                    st.success("공부 시간이 누적 기록에 성공적으로 저장되었습니다!")
+                    st.rerun()
+                else:
+                    st.warning("측정된 공부 시간이 없습니다.")
+
+        with btn_c3:
+            if st.button("🗑️ 과목 삭제", use_container_width=True):
+                if sw["active_sub_id"] == sub_id:
+                    sw["running"] = False
+                    sw["active_sub_id"] = None
+                    sw["accumulated"] = 0
+                st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub_id]
                 st.rerun()
 
-        if st.button("🗑️ 과목 삭제", use_container_width=True):
-            st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != selected_sub["id"]]
+        # 스톱워치가 작동 중일 때 1초마다 실시간 화면 자동 새로고침 갱신
+        if sw["running"]:
+            time.sleep(1)
             st.rerun()
 
 # -----------------------------------------------------------------------------
-# 6. Gemini AI 학습 분석
+# 7. Gemini AI 맞춤 학습 피드백
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.subheader("🤖 AI 맞춤 공부 진단")
