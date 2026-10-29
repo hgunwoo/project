@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. 세션 상태 초기화 (초기 테마: 라이트 모드)
+# 2. 세션 상태 초기화 (기본 테마: 라이트 모드)
 # -----------------------------------------------------------------------------
 if "subjects" not in st.session_state:
     st.session_state.subjects = []
@@ -28,7 +28,6 @@ if "student_info" not in st.session_state:
         "exam_date": None
     }
 
-# 라이트 모드 기본 설정
 if "theme" not in st.session_state:
     st.session_state.theme = "라이트 모드"
 
@@ -44,7 +43,7 @@ if "omr_results" not in st.session_state:
     st.session_state.omr_results = {}
 
 # -----------------------------------------------------------------------------
-# 3. 테마별 동적 적용 (라이트 모드 & 파스텔 모드만 유지)
+# 3. 테마별 동적 적용 (라이트 모드, 파스텔 모드만 사용)
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
@@ -129,7 +128,6 @@ st.markdown(f"""
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
-    # 다크 모드 제거: 라이트 모드와 파스텔 모드만 제공
     st.session_state.theme = st.selectbox(
         "🎨 앱 테마 선택", 
         ["라이트 모드", "파스텔 모드"], 
@@ -449,7 +447,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. 서버 Secrets 연동 Gemini AI 1:1 맞춤 피드백 (모델명 오류 수정 완료)
+# 7. Gemini API 예외 처리 강화 모델 호출 방식
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -493,11 +491,18 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                     """
 
                     client = genai.Client(api_key=api_key)
-                    # 지원 중단된 gemini-2.5-flash 대신 안정 표준 모델 gemini-1.5-flash로 수정
-                    response = client.models.generate_content(
-                        model='gemini-1.5-flash',
-                        contents=prompt,
-                    )
+                    
+                    # SDK 404 호환성 해결: 순차 호환 모델 시도 (gemini-2.0-flash -> gemini-1.5-flash)
+                    try:
+                        response = client.models.generate_content(
+                            model='gemini-2.0-flash',
+                            contents=prompt,
+                        )
+                    except Exception:
+                        response = client.models.generate_content(
+                            model='gemini-1.5-flash',
+                            contents=prompt,
+                        )
                     
                     st.markdown(f"""
                     <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
