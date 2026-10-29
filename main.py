@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. 세션 상태 초기화 (라이트 모드 기본)
+# 2. 세션 상태 초기화 (기본: 라이트 모드)
 # -----------------------------------------------------------------------------
 if "subjects" not in st.session_state:
     st.session_state.subjects = []
@@ -43,7 +43,7 @@ if "omr_results" not in st.session_state:
     st.session_state.omr_results = {}
 
 # -----------------------------------------------------------------------------
-# 3. 테마별 동적 적용 (라이트 모드, 파스텔 모드만 사용)
+# 3. 테마별 반응형 스타일링 (라이트 / 파스텔 전용)
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
@@ -447,7 +447,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. 404 완벽 방지: 사용 가능한 Gemini 모델 자동 탐색 호출 로직
+# 7. 검증된 gemini-1.5-flash 표준 연동 로직
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -463,6 +463,7 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
         else:
             with st.spinner("🧠 Gemini AI가 학습 데이터를 종합 분석하여 맞춤 처방전을 생성 중입니다..."):
                 try:
+                    # Google Generative AI API 키 인증
                     genai.configure(api_key=api_key)
                     
                     data_summary = []
@@ -492,45 +493,18 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                     4. 고등학생 친화적인 어조로 용기를 북돋아 주도록 3~4문단 정도로 작성해 주세요.
                     """
 
-                    # 사용 가능한 모델 목록 탐색 (404 예외 완벽 방지)
-                    available_models = [
-                        m.name for m in genai.list_models() 
-                        if 'generateContent' in m.supported_generation_methods
-                    ]
+                    # 구글 공식 호환 모델인 gemini-1.5-flash 호출
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model.generate_content(prompt)
                     
-                    # 우선순위 후보군 지정
-                    candidate_names = [
-                        'models/gemini-1.5-flash-latest',
-                        'models/gemini-1.5-flash',
-                        'models/gemini-1.0-pro',
-                        'models/gemini-pro'
-                    ]
-                    
-                    selected_model_name = None
-                    # 후보군 중 존재하는 모델 선택
-                    for cand in candidate_names:
-                        if cand in available_models:
-                            selected_model_name = cand
-                            break
-                    
-                    # 후보군에 없으면 첫 번째 사용 가능한 모델 자동 선택
-                    if not selected_model_name and available_models:
-                        selected_model_name = available_models[0]
-                    
-                    if not selected_model_name:
-                        st.error("사용 가능한 Gemini AI 모델을 찾지 못했습니다. API 키 상태를 확인하세요.")
-                    else:
-                        model = genai.GenerativeModel(selected_model_name)
-                        response = model.generate_content(prompt)
-                        
-                        st.markdown(f"""
-                        <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
-                            <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
-                            <div style="line-height: 1.7; font-size: 15px;">
-                                {response.text}
-                            </div>
+                    st.markdown(f"""
+                    <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
+                        <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
+                        <div style="line-height: 1.7; font-size: 15px;">
+                            {response.text}
                         </div>
-                        """, unsafe_allow_html=True)
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                 except Exception as e:
                     st.error(f"AI 조언 생성 중 오류가 발생했습니다: {e}")
