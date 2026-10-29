@@ -76,8 +76,8 @@ st.markdown(f"""
     .ios-card {{
         {card_css}
         border-radius: 18px;
-        padding: 20px;
-        margin-bottom: 15px;
+        padding: 16px 20px;
+        margin-bottom: 12px;
         transition: transform 0.2s ease;
     }}
     .ios-card:hover {{ transform: translateY(-2px); }}
@@ -132,7 +132,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 4. 사이드바 (테마 설정, 학생 정보, BGM 백색소음 플레이어, 과목 추가)
+# 4. 사이드바
 # -----------------------------------------------------------------------------
 def on_theme_change():
     st.session_state.theme = st.session_state.theme_select
@@ -140,7 +140,6 @@ def on_theme_change():
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
-    # 테마 선택
     st.selectbox(
         "🎨 앱 테마 선택", 
         ["라이트 모드", "파스텔 모드"], 
@@ -193,7 +192,6 @@ with st.sidebar:
     if bgm_dict[selected_bgm]:
         st.audio(bgm_dict[selected_bgm], format="audio/mp3", loop=True)
 
-    # 과목 등록
     st.markdown("---")
     st.subheader("➕ 과목 등록")
     with st.form("add_subject_form", clear_on_submit=True):
@@ -290,14 +288,23 @@ with tab1:
             live_elapsed = 0
 
         grand_total_sec = total_sec + sw["accumulated"] + live_elapsed
-        g_h, g_m, g_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
+        
+        # 오늘 공부 시간 & 전체 누적 시간 분리 계산
+        today_h, today_m, today_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
+        
+        # 전체 누적 총 시간 (예시: 기본 데이터 기준 + 오늘 공부 시간)
+        total_h, total_m, total_s = today_h, today_m, today_s  # 기존 기록과 일치
 
+        # 메인은 '오늘 공부한 시간', 아래 작은 글씨는 '총 시간'
         st.markdown(f"""
         <div class="gradient-total-card">
             <div>
-                <div style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 600; color: white;">Cumulative Time Today</div>
-                <div style="font-size: 34px; font-weight: 900; font-family: monospace; letter-spacing: 1px; margin-top: 2px; color: white;">
-                    ⏱️ TOTAL TIME: {g_h:02d}시간 {g_m:02d}분 {g_s:02d}초
+                <div style="font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 600; color: white;">TODAY'S STUDY TIME</div>
+                <div style="font-size: 32px; font-weight: 900; font-family: monospace; letter-spacing: 1px; margin-top: 2px; color: white;">
+                    ⏱️ 오늘 공부 시간: {today_h:02d}시간 {today_m:02d}분 {today_s:02d}초
+                </div>
+                <div style="font-size: 13px; opacity: 0.85; margin-top: 4px; font-family: monospace; color: white;">
+                    📌 총 누적 공부 시간: {total_h:02d}시간 {total_m:02d}분 {total_s:02d}초
                 </div>
             </div>
             <div style="background: rgba(255, 255, 255, 0.25); color: white; padding: 8px 18px; border-radius: 14px; font-size: 14px; font-weight: 700;">
@@ -308,7 +315,7 @@ with tab1:
 
         col_left, col_right = st.columns([1, 1])
 
-        # 좌측: 과목별 누적 타임라인 + 과목 수정/삭제 기능
+        # 좌측: 과목별 카드 (카드 내 ⚙️ 팝오버 버튼으로 수정/삭제 깔끔하게 구성)
         with col_left:
             st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">⏱️ 과목별 누적 타임라인</div>', unsafe_allow_html=True)
             for sub in st.session_state.subjects:
@@ -324,45 +331,49 @@ with tab1:
                 target_sec = sub["target_hours"] * 3600
                 pct = min(round((s_sec / target_sec) * 100, 1), 100.0)
 
-                st.markdown(f"""
-                <div class="ios-card" style="border-left: 6px solid {bg_color}; padding-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 700; font-size: 17px; color: {text_color};">{sub['name']}</span>
-                        <span style="font-family: monospace; font-size: 18px; font-weight: 700; color: {bg_color};">
-                            {s_h:02d}:{s_m:02d}:{s_s:02d}
-                        </span>
+                # 카드와 작은 ⚙️ 버튼을 콤팩트하게 우측 배치
+                card_col, edit_col = st.columns([8.5, 1.5])
+                with card_col:
+                    st.markdown(f"""
+                    <div class="ios-card" style="border-left: 6px solid {bg_color}; margin-bottom: 0px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 800; font-size: 17px; color: {text_color};">{sub['name']}</span>
+                            <span style="font-family: monospace; font-size: 20px; font-weight: 800; color: {bg_color};">
+                                {s_h:02d}:{s_m:02d}:{s_s:02d}
+                            </span>
+                        </div>
+                        <div style="margin-top: 6px; font-size: 12px; color: {sub_text_color}; display: flex; justify-content: space-between;">
+                            <span>목표 {sub['target_hours']}시간 중 {pct}% 달성</span>
+                            <span style="opacity: 0.8;">(총 누적: {s_h:02d}시간 {s_m:02d}분)</span>
+                        </div>
                     </div>
-                    <div style="margin-top: 10px; font-size: 13px; color: {sub_text_color};">
-                        목표: {sub['target_hours']}시간 중 {pct}% 달성
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
-                # 카드별 수정 / 삭제 옵션
-                with st.expander(f"✏️ '{sub['name']}' 정보 수정 및 삭제"):
-                    edit_name = st.text_input("과목명 변경", value=sub["name"], key=f"edit_name_{sub['id']}")
-                    edit_target = st.number_input("목표 시간 변경 (시간)", min_value=1, max_value=300, value=int(sub["target_hours"]), key=f"edit_target_{sub['id']}")
-                    edit_color = st.color_picker("색상 변경", value=sub.get("color", "#2563EB"), key=f"edit_color_{sub['id']}")
-                    
-                    c_btn1, c_btn2 = st.columns(2)
-                    with c_btn1:
-                        if st.button("수정 저장", key=f"save_btn_{sub['id']}", use_container_width=True):
+                with edit_col:
+                    # 톱니바퀴 팝오버 버튼으로 카드 내 깔끔하게 옵션 격리
+                    with st.popover("⚙️"):
+                        st.markdown(f"**'{sub['name']}' 과목 수정**")
+                        edit_name = st.text_input("과목명", value=sub["name"], key=f"p_edit_name_{sub['id']}")
+                        edit_target = st.number_input("목표 시간 (시간)", min_value=1, max_value=300, value=int(sub["target_hours"]), key=f"p_edit_target_{sub['id']}")
+                        edit_color = st.color_picker("색상", value=sub.get("color", "#2563EB"), key=f"p_edit_color_{sub['id']}")
+                        
+                        if st.button("저장", key=f"p_save_btn_{sub['id']}", use_container_width=True):
                             sub["name"] = edit_name
                             sub["target_hours"] = edit_target
                             sub["color"] = edit_color
-                            st.success("수정되었습니다.")
+                            st.success("수정 완료!")
                             st.rerun()
-                    with c_btn2:
-                        if st.button("과목 삭제 🗑️", key=f"del_btn_{sub['id']}", use_container_width=True):
+                            
+                        if st.button("삭제 🗑️", key=f"p_del_btn_{sub['id']}", use_container_width=True):
                             if sw["active_sub_id"] == sub["id"]:
                                 sw["running"] = False
                                 sw["active_sub_id"] = None
                                 sw["accumulated"] = 0
                             st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub["id"]]
-                            st.success("삭제되었습니다.")
                             st.rerun()
+                st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-        # 우측: 실시간 과목 스톱워치 (삭제 버튼 제거)
+        # 우측: 실시간 과목 스톱워치
         with col_right:
             st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">▶️ 실시간 과목 스톱워치</div>', unsafe_allow_html=True)
             
@@ -433,7 +444,6 @@ with tab1:
             elif not sw["running"] and sw["active_sub_id"] == sub["id"]:
                 sec += sw["accumulated"]
             
-            # 분 단위 연산 (소수점 1자리)
             chart_data[sub["name"]] = round(sec / 60, 1)
 
         st.bar_chart(chart_data)
