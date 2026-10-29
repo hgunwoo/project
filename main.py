@@ -1,7 +1,7 @@
 import streamlit as st
 import datetime
 import time
-import google.generativeai as genai
+from google import genai
 
 # -----------------------------------------------------------------------------
 # 1. 페이지 세팅
@@ -444,10 +444,10 @@ with tab3:
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.info("왼쪽 폼에서 가채점 결과를 입력하면 저장됩니다.")
+                st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. 동적 모델 자동 검색 방식 (404 예외 완전 차단)
+# 7. 최신 권장 모델 gemini-3.8-flash 지정을 통한 완벽 실행
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -461,10 +461,8 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
         if not api_key:
             st.error("⚠️ Streamlit Secrets 설정에 'GEMINI_API_KEY'가 설정되지 않았습니다. 관리자 설정(Secrets)을 확인해주세요.")
         else:
-            with st.spinner("🧠 사용 가능한 Gemini 모델을 자동 연동 중입니다..."):
+            with st.spinner("🧠 Gemini AI가 학습 데이터를 종합 분석하여 맞춤 처방전을 생성 중입니다..."):
                 try:
-                    genai.configure(api_key=api_key)
-                    
                     data_summary = []
                     for s in st.session_state.subjects:
                         logged_h = round(s.get("logged_seconds", 0) / 3600, 1)
@@ -492,34 +490,21 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                     4. 고등학생 친화적인 어조로 용기를 북돋아 주도록 3~4문단 정도로 작성해 주세요.
                     """
 
-                    # 현재 API 키로 접근 가능한 모든 모델 자동 검색
-                    valid_models = []
-                    for m in genai.list_models():
-                        if 'generateContent' in m.supported_generation_methods:
-                            valid_models.append(m.name)
+                    # 구글 AI 가이드라인 최신 권장 표준 모델 지정
+                    client = genai.Client(api_key=api_key)
+                    response = client.models.generate_content(
+                        model='gemini-3.8-flash',
+                        contents=prompt,
+                    )
                     
-                    if not valid_models:
-                        st.error("API 키에서 텍스트 생성이 가능한 모델을 찾지 못했습니다. Google AI Studio에서 API 키를 다시 확인해 주세요.")
-                    else:
-                        # 404를 유발할 수 있는 'models/' 접두사 자동 처리
-                        target_model_name = valid_models[0]
-                        for m_name in valid_models:
-                            if 'flash' in m_name or 'pro' in m_name:
-                                target_model_name = m_name
-                                break
-                        
-                        # 모델 생성 및 피드백 출력
-                        model = genai.GenerativeModel(target_model_name)
-                        response = model.generate_content(prompt)
-                        
-                        st.markdown(f"""
-                        <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
-                            <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
-                            <div style="line-height: 1.7; font-size: 15px;">
-                                {response.text}
-                            </div>
+                    st.markdown(f"""
+                    <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
+                        <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
+                        <div style="line-height: 1.7; font-size: 15px;">
+                            {response.text}
                         </div>
-                        """, unsafe_allow_html=True)
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                 except Exception as e:
                     st.error(f"AI 조언 생성 중 오류가 발생했습니다: {e}")
