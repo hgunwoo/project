@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. 세션 상태 초기화 (기본: 라이트 모드)
+# 2. 세션 상태 초기화
 # -----------------------------------------------------------------------------
 if "subjects" not in st.session_state:
     st.session_state.subjects = []
@@ -43,7 +43,7 @@ if "omr_results" not in st.session_state:
     st.session_state.omr_results = {}
 
 # -----------------------------------------------------------------------------
-# 3. 테마별 반응형 스타일링 (라이트 / 파스텔 전용)
+# 3. 테마 별 동적 적용 (라이트 모드 & 파스텔 모드)
 # -----------------------------------------------------------------------------
 current_theme = st.session_state.theme
 
@@ -66,6 +66,7 @@ else:  # 라이트 모드 (기본)
     timer_box_bg = "background: #EFF6FF; border: 2px dashed #3B82F6;"
     timer_text_color = "#1D4ED8"
 
+# CSS 애니메이션 (5초 조언 전환용 페이드인)
 st.markdown(f"""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -116,6 +117,15 @@ st.markdown(f"""
         display: inline-block;
     }}
     
+    .quote-animated {{
+        animation: fadeIn 1s ease-in-out;
+    }}
+
+    @keyframes fadeIn {{
+        from {{ opacity: 0; transform: translateY(4px); }}
+        to {{ opacity: 1; transform: translateY(0); }}
+    }}
+
     .danger-badge-high {{ background: #DC2626; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
     .danger-badge-mid {{ background: #D97706; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
     .danger-badge-low {{ background: #059669; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 12px; }}
@@ -123,15 +133,21 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 4. 사이드바 (설정 & 과목 추가)
+# 4. 사이드바 (실시간 테마 변경 & 학생 정보 저장)
 # -----------------------------------------------------------------------------
+def on_theme_change():
+    st.session_state.theme = st.session_state.theme_select
+
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
-    st.session_state.theme = st.selectbox(
+    # 테마 선택 시 즉시 반영되도록 key와 on_change 연결
+    st.selectbox(
         "🎨 앱 테마 선택", 
         ["라이트 모드", "파스텔 모드"], 
-        index=["라이트 모드", "파스텔 모드"].index(st.session_state.theme) if st.session_state.theme in ["라이트 모드", "파스텔 모드"] else 0
+        index=0 if st.session_state.theme == "라이트 모드" else 1,
+        key="theme_select",
+        on_change=on_theme_change
     )
 
     with st.expander("👤 학생 및 지필고사 정보", expanded=True):
@@ -159,7 +175,7 @@ with st.sidebar:
                 "name": name,
                 "exam_date": exam_date
             }
-            st.success("정보가 저장되었습니다.")
+            st.success("학생 정보가 저장되었습니다!")
             st.rerun()
 
     st.markdown("---")
@@ -186,20 +202,31 @@ with st.sidebar:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. 메인 헤더 배너
+# 5. 메인 헤더 배너 (5초마다 명언 변경 및 설정 미완료시만 안내 문구 출력)
 # -----------------------------------------------------------------------------
 QUOTES = [
     "“지금 자면 꿈을 꾸지만, 지금 공부하면 꿈을 이룬다.”",
     "“성공은 매일 반복되는 작은 노력들의 합이다.”",
     "“오늘 흘린 땀은 내일의 배신을 하지 않는다.”",
-    "“포기하고 싶을 때, 왜 시작했는지 생각하라.”"
+    "“포기하고 싶을 때, 왜 시작했는지 생각하라.”",
+    "“오늘 할 수 있는 일에 집중하는 것이 미래를 만드는 길이다.”"
 ]
-quote_index = int(time.time() // 10) % len(QUOTES)
+# 5초마다 인덱스 변경
+quote_index = int(time.time() // 5) % len(QUOTES)
 
 info = st.session_state.student_info
-student_str = f"{info['school']} {info['grade']} {info['class_num']} {info['name']}".strip()
+school_part = f"{info['school']} ".strip() if info['school'] else ""
+grade_part = f"{info['grade']} ".strip() if info['grade'] else ""
+class_part = f"{info['class_num']} ".strip() if info['class_num'] else ""
+name_part = f"{info['name']}".strip() if info['name'] else ""
+
+student_str = f"{school_part} {grade_part}{class_part}{name_part}".strip()
+
+# 설정이 입력되지 않았을 경우에만 안내 텍스트 표시
 if not student_str:
     student_str = "사이드바에서 학생 정보와 지필고사 일을 설정하세요."
+else:
+    student_str = f"🏫 {student_str}"
 
 exam_d = info["exam_date"]
 if exam_d is None:
@@ -214,8 +241,8 @@ st.markdown(f"""
 <div class="banner-box">
     <div>
         <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: white;">🍎 스터디플래너 AI</h1>
-        <p style="margin: 6px 0 0 0; opacity: 0.95; font-size: 15px; color: white;">🏫 <b>{student_str}</b></p>
-        <p style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 13px; display: inline-block; color: white;">
+        <p style="margin: 6px 0 0 0; opacity: 0.95; font-size: 15px; color: white;"><b>{student_str}</b></p>
+        <p class="quote-animated" style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 13px; display: inline-block; color: white;">
             💬 {QUOTES[quote_index]}
         </p>
     </div>
@@ -408,7 +435,7 @@ with tab3:
     st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
     else:
         target_omr_sub = st.selectbox("가채점할 과목 선택", [s["name"] for s in st.session_state.subjects])
         
@@ -447,7 +474,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. 최신 권장 모델 gemini-3.8-flash 지정을 통한 완벽 실행
+# 7. Gemini API 기반 1:1 맞춤 피드백
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -461,42 +488,52 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
         if not api_key:
             st.error("⚠️ Streamlit Secrets 설정에 'GEMINI_API_KEY'가 설정되지 않았습니다. 관리자 설정(Secrets)을 확인해주세요.")
         else:
-            with st.spinner("🧠 Gemini AI가 학습 데이터를 종합 분석하여 맞춤 처방전을 생성 중입니다..."):
-                try:
-                    data_summary = []
-                    for s in st.session_state.subjects:
-                        logged_h = round(s.get("logged_seconds", 0) / 3600, 1)
-                        target_h = s.get("target_hours", 10)
-                        omr = st.session_state.omr_results.get(s["name"], None)
-                        omr_str = f", OMR가채점점수: {omr['score']}점, 주요감점원인: {', '.join(omr['errors'])}" if omr else ""
-                        data_summary.append(f"- 과목: {s['name']} (목표: {target_h}시간 중 현재 {logged_h}시간 달성{omr_str})")
-                    
-                    student_info_str = f"{st.session_state.student_info['school']} {st.session_state.student_info['grade']} {st.session_state.student_info['name']}"
-                    
-                    prompt = f"""
-                    당신은 고등학생을 위한 친절하고 명확한 전문 학습 코치 AI입니다.
-                    다음 학생의 지필고사 학습 데이터를 기반으로 동기부여와 함께 실질적이고 구체적인 과목별 맞춤 공부 조언을 제공해 주세요.
+            with st.spinner("🧠 Gemini AI가 학습 데이터를 분석하여 맞춤 처방전을 생성 중입니다..."):
+                data_summary = []
+                for s in st.session_state.subjects:
+                    logged_h = round(s.get("logged_seconds", 0) / 3600, 1)
+                    target_h = s.get("target_hours", 10)
+                    omr = st.session_state.omr_results.get(s["name"], None)
+                    omr_str = f", OMR가채점점수: {omr['score']}점, 주요감점원인: {', '.join(omr['errors'])}" if omr else ""
+                    data_summary.append(f"- 과목: {s['name']} (목표: {target_h}시간 중 현재 {logged_h}시간 달성{omr_str})")
+                
+                prompt = f"""
+                당신은 고등학생을 위한 친절하고 명확한 전문 학습 코치 AI입니다.
+                다음 학생의 지필고사 학습 데이터를 기반으로 동기부여와 함께 실질적이고 구체적인 과목별 맞춤 공부 조언을 제공해 주세요.
 
-                    [학생 정보]
-                    - 학생: {student_info_str}
-                    - 지필고사 카운트다운: {d_day_text} (D-Day)
-                    - 과목별 학습 현황:
-                    {chr(10).join(data_summary)}
+                [학생 정보]
+                - 학생: {student_str}
+                - 지필고사 카운트다운: {d_day_text} (D-Day)
+                - 과목별 학습 현황:
+                {chr(10).join(data_summary)}
 
-                    [작성 지침]
-                    1. 고정 템플릿 멘트를 피하고 학생 맞춤형으로 작성하세요.
-                    2. 현재 남아있는 D-Day 대비 진척도가 부족한 과목을 우선 짚어주고, 공부 순서 및 전략을 제시하세요.
-                    3. OMR 오답 원인(계산 실수, 시간 부족 등)이 있다면 실용적인 꿀팁을 포함해 주세요.
-                    4. 고등학생 친화적인 어조로 용기를 북돋아 주도록 3~4문단 정도로 작성해 주세요.
-                    """
+                [작성 지침]
+                1. 고정 템플릿 멘트를 피하고 학생 맞춤형으로 작성하세요.
+                2. 현재 남아있는 D-Day 대비 진척도가 부족한 과목을 우선 짚어주고, 공부 순서 및 전략을 제시하세요.
+                3. OMR 오답 원인(계산 실수, 시간 부족 등)이 있다면 실용적인 꿀팁을 포함해 주세요.
+                4. 고등학생 친화적인 어조로 용기를 북돋아 주도록 3~4문단 정도로 작성해 주세요.
+                """
 
-                    # 구글 AI 가이드라인 최신 권장 표준 모델 지정
-                    client = genai.Client(api_key=api_key)
-                    response = client.models.generate_content(
-                        model='gemini-3.8-flash',
-                        contents=prompt,
-                    )
-                    
+                client = genai.Client(api_key=api_key)
+                response = None
+                max_retries = 3
+                
+                for attempt in range(max_retries):
+                    try:
+                        response = client.models.generate_content(
+                            model='gemini-3.8-flash',
+                            contents=prompt,
+                        )
+                        break
+                    except Exception as e:
+                        if "503" in str(e) and attempt < max_retries - 1:
+                            time.sleep(2)
+                            continue
+                        else:
+                            st.error(f"AI 조언 생성 중 오류가 발생했습니다: {e}")
+                            break
+
+                if response and hasattr(response, 'text'):
                     st.markdown(f"""
                     <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
                         <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
@@ -505,6 +542,3 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                    
-                except Exception as e:
-                    st.error(f"AI 조언 생성 중 오류가 발생했습니다: {e}")
