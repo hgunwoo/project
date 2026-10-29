@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. 세션 상태 초기화 (기본 테마: 라이트 모드)
+# 2. 세션 상태 초기화 (라이트 모드 기본)
 # -----------------------------------------------------------------------------
 if "subjects" not in st.session_state:
     st.session_state.subjects = []
@@ -371,7 +371,7 @@ with tab2:
     st.caption("남은 D-Day와 목표 시간 대비 달성률을 알고리즘으로 연산하여 과목별 위험 지수를 측정합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
     else:
         for sub in st.session_state.subjects:
             target_sec = sub["target_hours"] * 3600
@@ -408,7 +408,7 @@ with tab3:
     st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
     else:
         target_omr_sub = st.selectbox("가채점할 과목 선택", [s["name"] for s in st.session_state.subjects])
         
@@ -447,7 +447,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. 안정성이 보장된 google-generativeai 기반 API 연동
+# 7. 404 완벽 방지: 사용 가능한 Gemini 모델 자동 탐색 호출 로직
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -463,7 +463,6 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
         else:
             with st.spinner("🧠 Gemini AI가 학습 데이터를 종합 분석하여 맞춤 처방전을 생성 중입니다..."):
                 try:
-                    # API Key 설정
                     genai.configure(api_key=api_key)
                     
                     data_summary = []
@@ -493,18 +492,45 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                     4. 고등학생 친화적인 어조로 용기를 북돋아 주도록 3~4문단 정도로 작성해 주세요.
                     """
 
-                    # 가장 안정적인 v1beta 호환 gemini-1.5-flash 모델 생성
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(prompt)
+                    # 사용 가능한 모델 목록 탐색 (404 예외 완벽 방지)
+                    available_models = [
+                        m.name for m in genai.list_models() 
+                        if 'generateContent' in m.supported_generation_methods
+                    ]
                     
-                    st.markdown(f"""
-                    <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
-                        <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
-                        <div style="line-height: 1.7; font-size: 15px;">
-                            {response.text}
+                    # 우선순위 후보군 지정
+                    candidate_names = [
+                        'models/gemini-1.5-flash-latest',
+                        'models/gemini-1.5-flash',
+                        'models/gemini-1.0-pro',
+                        'models/gemini-pro'
+                    ]
+                    
+                    selected_model_name = None
+                    # 후보군 중 존재하는 모델 선택
+                    for cand in candidate_names:
+                        if cand in available_models:
+                            selected_model_name = cand
+                            break
+                    
+                    # 후보군에 없으면 첫 번째 사용 가능한 모델 자동 선택
+                    if not selected_model_name and available_models:
+                        selected_model_name = available_models[0]
+                    
+                    if not selected_model_name:
+                        st.error("사용 가능한 Gemini AI 모델을 찾지 못했습니다. API 키 상태를 확인하세요.")
+                    else:
+                        model = genai.GenerativeModel(selected_model_name)
+                        response = model.generate_content(prompt)
+                        
+                        st.markdown(f"""
+                        <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
+                            <h4 style="margin-top:0; color:#8B5CF6;">🤖 Gemini AI의 맞춤 학습 처방전</h4>
+                            <div style="line-height: 1.7; font-size: 15px;">
+                                {response.text}
+                            </div>
                         </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
                     
                 except Exception as e:
                     st.error(f"AI 조언 생성 중 오류가 발생했습니다: {e}")
