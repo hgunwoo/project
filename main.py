@@ -66,7 +66,6 @@ else:  # 라이트 모드 (기본)
     timer_box_bg = "background: #EFF6FF; border: 2px dashed #3B82F6;"
     timer_text_color = "#1D4ED8"
 
-# CSS 애니메이션 (5초 조언 전환용 페이드인)
 st.markdown(f"""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -133,7 +132,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 4. 사이드바 (실시간 테마 변경 & 학생 정보 저장)
+# 4. 사이드바 (테마 설정, 학생 정보, BGM 백색소음 플레이어, 과목 추가)
 # -----------------------------------------------------------------------------
 def on_theme_change():
     st.session_state.theme = st.session_state.theme_select
@@ -141,7 +140,7 @@ def on_theme_change():
 with st.sidebar:
     st.title("⚙️ 스터디 설정")
     
-    # 테마 선택 시 즉시 반영되도록 key와 on_change 연결
+    # 테마 선택
     st.selectbox(
         "🎨 앱 테마 선택", 
         ["라이트 모드", "파스텔 모드"], 
@@ -178,6 +177,23 @@ with st.sidebar:
             st.success("학생 정보가 저장되었습니다!")
             st.rerun()
 
+    # --- 🎧 집중 BGM / 백색소음 ---
+    st.markdown("---")
+    st.subheader("🎧 집중 BGM & 백색소음")
+    bgm_dict = {
+        "끄기 🔇": None,
+        "🎹 잔잔한 피아노 음악": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        "🌧️ 차분한 빗소리": "https://assets.mixkit.co/active_storage/sfx/2515/2515-preview.mp3",
+        "🌊 잔잔한 파도 소리": "https://assets.mixkit.co/active_storage/sfx/1188/1188-preview.mp3",
+        "🔥 따뜻한 모닥불 소리": "https://assets.mixkit.co/active_storage/sfx/2670/2670-preview.mp3",
+        "☕ 아늑한 카페 소음": "https://assets.mixkit.co/active_storage/sfx/350/350-preview.mp3"
+    }
+    
+    selected_bgm = st.selectbox("배경음 선택", list(bgm_dict.keys()))
+    if bgm_dict[selected_bgm]:
+        st.audio(bgm_dict[selected_bgm], format="audio/mp3", loop=True)
+
+    # 과목 등록
     st.markdown("---")
     st.subheader("➕ 과목 등록")
     with st.form("add_subject_form", clear_on_submit=True):
@@ -202,7 +218,7 @@ with st.sidebar:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. 메인 헤더 배너 (5초마다 명언 변경 및 설정 미완료시만 안내 문구 출력)
+# 5. 메인 헤더 배너
 # -----------------------------------------------------------------------------
 QUOTES = [
     "“지금 자면 꿈을 꾸지만, 지금 공부하면 꿈을 이룬다.”",
@@ -211,18 +227,18 @@ QUOTES = [
     "“포기하고 싶을 때, 왜 시작했는지 생각하라.”",
     "“오늘 할 수 있는 일에 집중하는 것이 미래를 만드는 길이다.”"
 ]
-# 5초마다 인덱스 변경
 quote_index = int(time.time() // 5) % len(QUOTES)
 
 info = st.session_state.student_info
-school_part = f"{info['school']} ".strip() if info['school'] else ""
-grade_part = f"{info['grade']} ".strip() if info['grade'] else ""
-class_part = f"{info['class_num']} ".strip() if info['class_num'] else ""
-name_part = f"{info['name']}".strip() if info['name'] else ""
 
-student_str = f"{school_part} {grade_part}{class_part}{name_part}".strip()
+info_parts = [
+    info["school"].strip() if info["school"] else "",
+    info["grade"].strip() if info["grade"] else "",
+    info["class_num"].strip() if info["class_num"] else "",
+    info["name"].strip() if info["name"] else ""
+]
+student_str = " ".join([p for p in info_parts if p])
 
-# 설정이 입력되지 않았을 경우에만 안내 텍스트 표시
 if not student_str:
     student_str = "사이드바에서 학생 정보와 지필고사 일을 설정하세요."
 else:
@@ -292,6 +308,7 @@ with tab1:
 
         col_left, col_right = st.columns([1, 1])
 
+        # 좌측: 과목별 누적 타임라인 + 과목 수정/삭제 기능
         with col_left:
             st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">⏱️ 과목별 누적 타임라인</div>', unsafe_allow_html=True)
             for sub in st.session_state.subjects:
@@ -308,7 +325,7 @@ with tab1:
                 pct = min(round((s_sec / target_sec) * 100, 1), 100.0)
 
                 st.markdown(f"""
-                <div class="ios-card" style="border-left: 6px solid {bg_color};">
+                <div class="ios-card" style="border-left: 6px solid {bg_color}; padding-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-weight: 700; font-size: 17px; color: {text_color};">{sub['name']}</span>
                         <span style="font-family: monospace; font-size: 18px; font-weight: 700; color: {bg_color};">
@@ -321,6 +338,31 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
 
+                # 카드별 수정 / 삭제 옵션
+                with st.expander(f"✏️ '{sub['name']}' 정보 수정 및 삭제"):
+                    edit_name = st.text_input("과목명 변경", value=sub["name"], key=f"edit_name_{sub['id']}")
+                    edit_target = st.number_input("목표 시간 변경 (시간)", min_value=1, max_value=300, value=int(sub["target_hours"]), key=f"edit_target_{sub['id']}")
+                    edit_color = st.color_picker("색상 변경", value=sub.get("color", "#2563EB"), key=f"edit_color_{sub['id']}")
+                    
+                    c_btn1, c_btn2 = st.columns(2)
+                    with c_btn1:
+                        if st.button("수정 저장", key=f"save_btn_{sub['id']}", use_container_width=True):
+                            sub["name"] = edit_name
+                            sub["target_hours"] = edit_target
+                            sub["color"] = edit_color
+                            st.success("수정되었습니다.")
+                            st.rerun()
+                    with c_btn2:
+                        if st.button("과목 삭제 🗑️", key=f"del_btn_{sub['id']}", use_container_width=True):
+                            if sw["active_sub_id"] == sub["id"]:
+                                sw["running"] = False
+                                sw["active_sub_id"] = None
+                                sw["accumulated"] = 0
+                            st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub["id"]]
+                            st.success("삭제되었습니다.")
+                            st.rerun()
+
+        # 우측: 실시간 과목 스톱워치 (삭제 버튼 제거)
         with col_right:
             st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">▶️ 실시간 과목 스톱워치</div>', unsafe_allow_html=True)
             
@@ -348,7 +390,7 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
 
-            btn_c1, btn_c2, btn_c3 = st.columns(3)
+            btn_c1, btn_c2 = st.columns(2)
 
             with btn_c1:
                 if not (sw["running"] and is_current_active):
@@ -379,14 +421,22 @@ with tab1:
                     else:
                         st.warning("측정된 공부 시간이 없습니다.")
 
-            with btn_c3:
-                if st.button("🗑️ 과목 삭제", use_container_width=True):
-                    if sw["active_sub_id"] == sub_id:
-                        sw["running"] = False
-                        sw["active_sub_id"] = None
-                        sw["accumulated"] = 0
-                    st.session_state.subjects = [s for s in st.session_state.subjects if s["id"] != sub_id]
-                    st.rerun()
+        # --- 과목별 공부 시간 일일 분석 그래프 ---
+        st.markdown("---")
+        st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">📈 과목별 일일 공부 시간 분석 (분 단위)</div>', unsafe_allow_html=True)
+        
+        chart_data = {}
+        for sub in st.session_state.subjects:
+            sec = sub.get("logged_seconds", 0)
+            if sw["running"] and sw["active_sub_id"] == sub["id"]:
+                sec += sw["accumulated"] + live_elapsed
+            elif not sw["running"] and sw["active_sub_id"] == sub["id"]:
+                sec += sw["accumulated"]
+            
+            # 분 단위 연산 (소수점 1자리)
+            chart_data[sub["name"]] = round(sec / 60, 1)
+
+        st.bar_chart(chart_data)
 
         if sw["running"]:
             time.sleep(1)
@@ -435,7 +485,7 @@ with tab3:
     st.caption("시험 종료 후 가채점을 진행하고, 자주 틀리는 오답 이유를 분석합니다.")
 
     if not st.session_state.subjects:
-        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 주세요.")
+        st.info("등록된 과목이 없습니다. 사이드바에서 과목을 먼저 등록해 보세요.")
     else:
         target_omr_sub = st.selectbox("가채점할 과목 선택", [s["name"] for s in st.session_state.subjects])
         
