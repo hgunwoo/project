@@ -1,7 +1,7 @@
 import streamlit as st
 import datetime
 import time
-from google import genai
+import google.generativeai as genai
 
 # -----------------------------------------------------------------------------
 # 1. 페이지 세팅
@@ -447,7 +447,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. Gemini API 예외 처리 강화 모델 호출 방식
+# 7. 안정성이 보장된 google-generativeai 기반 API 연동
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -463,6 +463,9 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
         else:
             with st.spinner("🧠 Gemini AI가 학습 데이터를 종합 분석하여 맞춤 처방전을 생성 중입니다..."):
                 try:
+                    # API Key 설정
+                    genai.configure(api_key=api_key)
+                    
                     data_summary = []
                     for s in st.session_state.subjects:
                         logged_h = round(s.get("logged_seconds", 0) / 3600, 1)
@@ -490,19 +493,9 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                     4. 고등학생 친화적인 어조로 용기를 북돋아 주도록 3~4문단 정도로 작성해 주세요.
                     """
 
-                    client = genai.Client(api_key=api_key)
-                    
-                    # SDK 404 호환성 해결: 순차 호환 모델 시도 (gemini-2.0-flash -> gemini-1.5-flash)
-                    try:
-                        response = client.models.generate_content(
-                            model='gemini-2.0-flash',
-                            contents=prompt,
-                        )
-                    except Exception:
-                        response = client.models.generate_content(
-                            model='gemini-1.5-flash',
-                            contents=prompt,
-                        )
+                    # 가장 안정적인 v1beta 호환 gemini-1.5-flash 모델 생성
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model.generate_content(prompt)
                     
                     st.markdown(f"""
                     <div class="ios-card" style="border-left: 6px solid #8B5CF6; margin-top: 15px;">
