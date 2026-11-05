@@ -7,7 +7,7 @@ from google import genai
 # 1. 페이지 세팅
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="스터디플래너 AI",
+    page_title="STUDY PLANNER AI",
     page_icon="🍎",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -152,10 +152,10 @@ with st.sidebar:
         school = st.text_input("학교명", value=st.session_state.student_info["school"], placeholder="예: OO고등학교")
         col_g, col_c = st.columns(2)
         with col_g:
-            grade = st.text_input("학년", value=st.session_state.student_info["grade"], placeholder="예: 2학년")
+            grade = st.text_input("학년", value=st.session_state.student_info["grade"], placeholder="예: O학년")
         with col_c:
-            class_num = st.text_input("반", value=st.session_state.student_info["class_num"], placeholder="예: 8반")
-        name = st.text_input("이름", value=st.session_state.student_info["name"], placeholder="예: 한건우")
+            class_num = st.text_input("반", value=st.session_state.student_info["class_num"], placeholder="예: O반")
+        name = st.text_input("이름", value=st.session_state.student_info["name"], placeholder="예: OOO")
         
         st.markdown("**🗓️ 지필고사 시작일 설정**")
         set_exam = st.checkbox("시험일 지정하기", value=(st.session_state.student_info["exam_date"] is not None))
@@ -254,7 +254,7 @@ else:
 st.markdown(f"""
 <div class="banner-box">
     <div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: white;">🍎 스터디플래너 AI</h1>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: white;">🍎 STUDY PLANNER AI</h1>
         <p style="margin: 6px 0 0 0; opacity: 0.95; font-size: 15px; color: white;"><b>{student_str}</b></p>
         <p class="quote-animated" style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 13px; display: inline-block; color: white;">
             💬 {QUOTES[quote_index]}
@@ -289,13 +289,10 @@ with tab1:
 
         grand_total_sec = total_sec + sw["accumulated"] + live_elapsed
         
-        # 오늘 공부 시간 & 전체 누적 시간 분리 계산
         today_h, today_m, today_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
-        
-        # 전체 누적 총 시간 (예시: 기본 데이터 기준 + 오늘 공부 시간)
-        total_h, total_m, total_s = today_h, today_m, today_s  # 기존 기록과 일치
+        total_h, total_m, total_s = today_h, today_m, today_s
 
-        # 메인은 '오늘 공부한 시간', 아래 작은 글씨는 '총 시간'
+        # 열공 중 배제 후 깔끔한 총 시간 카드 구성
         st.markdown(f"""
         <div class="gradient-total-card">
             <div>
@@ -307,15 +304,11 @@ with tab1:
                     📌 총 누적 공부 시간: {total_h:02d}시간 {total_m:02d}분 {total_s:02d}초
                 </div>
             </div>
-            <div style="background: rgba(255, 255, 255, 0.25); color: white; padding: 8px 18px; border-radius: 14px; font-size: 14px; font-weight: 700;">
-                🔥 열공 중!
-            </div>
         </div>
         """, unsafe_allow_html=True)
 
         col_left, col_right = st.columns([1, 1])
 
-        # 좌측: 과목별 카드 (카드 내 ⚙️ 팝오버 버튼으로 수정/삭제 깔끔하게 구성)
         with col_left:
             st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">⏱️ 과목별 누적 타임라인</div>', unsafe_allow_html=True)
             for sub in st.session_state.subjects:
@@ -331,7 +324,6 @@ with tab1:
                 target_sec = sub["target_hours"] * 3600
                 pct = min(round((s_sec / target_sec) * 100, 1), 100.0)
 
-                # 카드와 작은 ⚙️ 버튼을 콤팩트하게 우측 배치
                 card_col, edit_col = st.columns([8.5, 1.5])
                 with card_col:
                     st.markdown(f"""
@@ -350,7 +342,6 @@ with tab1:
                     """, unsafe_allow_html=True)
 
                 with edit_col:
-                    # 톱니바퀴 팝오버 버튼으로 카드 내 깔끔하게 옵션 격리
                     with st.popover("⚙️"):
                         st.markdown(f"**'{sub['name']}' 과목 수정**")
                         edit_name = st.text_input("과목명", value=sub["name"], key=f"p_edit_name_{sub['id']}")
@@ -373,7 +364,6 @@ with tab1:
                             st.rerun()
                 st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-        # 우측: 실시간 과목 스톱워치
         with col_right:
             st.markdown('<div class="gradient-header-text" style="font-size: 18px; margin-bottom: 12px;">▶️ 실시간 과목 스톱워치</div>', unsafe_allow_html=True)
             
