@@ -216,7 +216,7 @@ with st.sidebar:
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. 메인 헤더 배너
+# 5. 메인 헤더 배너 (로고: 📖 책으로 수정)
 # -----------------------------------------------------------------------------
 QUOTES = [
     "“지금 자면 꿈을 꾸지만, 지금 공부하면 꿈을 이룬다.”",
@@ -254,7 +254,7 @@ else:
 st.markdown(f"""
 <div class="banner-box">
     <div>
-        <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: white;">🍎 STUDY PLANNER AI</h1>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: white;">📖 STUDY PLANNER AI</h1>
         <p style="margin: 6px 0 0 0; opacity: 0.95; font-size: 15px; color: white;"><b>{student_str}</b></p>
         <p class="quote-animated" style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 13px; display: inline-block; color: white;">
             💬 {QUOTES[quote_index]}
@@ -292,7 +292,6 @@ with tab1:
         today_h, today_m, today_s = grand_total_sec // 3600, (grand_total_sec % 3600) // 60, grand_total_sec % 60
         total_h, total_m, total_s = today_h, today_m, today_s
 
-        # 열공 중 배제 후 깔끔한 총 시간 카드 구성
         st.markdown(f"""
         <div class="gradient-total-card">
             <div>
@@ -524,7 +523,7 @@ with tab3:
                 st.info("왼쪽 폼에서 가채점 결과를 등록하면 저장됩니다.")
 
 # -----------------------------------------------------------------------------
-# 7. Gemini API 기반 1:1 맞춤 피드백
+# 7. Gemini API 기반 1:1 맞춤 피드백 (오류 원문 대신 깔끔한 안내 메시지 출력)
 # -----------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="gradient-header-text" style="font-size: 20px; margin-bottom: 15px;">🤖 실시간 Gemini AI 1:1 맞춤 피드백</div>', unsafe_allow_html=True)
@@ -576,11 +575,12 @@ if st.button("✨ Gemini AI 실시간 맞춤 조언 및 학습 처방전 받기"
                         )
                         break
                     except Exception as e:
-                        if "503" in str(e) and attempt < max_retries - 1:
+                        if attempt < max_retries - 1:
                             time.sleep(2)
                             continue
                         else:
-                            st.error(f"AI 조언 생성 중 오류가 발생했습니다: {e}")
+                            # 길고 복잡한 개발자용 에러 코드 대신 깔끔한 알림창 표출
+                            st.warning("⚠️ AI 조언을 생성할 수 없습니다. 잠시 후 다시 시도해 주세요.")
                             break
 
                 if response and hasattr(response, 'text'):
